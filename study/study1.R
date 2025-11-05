@@ -149,7 +149,8 @@ code.surgery.named <- with(stack(code.surgery),
 
 t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 
-a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
+# a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
+a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
 cat("Total number of subjects:", nrow(a.start))
 
 
@@ -178,8 +179,8 @@ a <- t20[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT 
 #a <- data[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"]
 #INDI_DSCM_NO 대신 RN_INDI t20 대신 data 써야함.
 
-## 정신질환자 제외
-a[!(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), ] %>% dim 
+## 정신질환자 제외 (우울증 발생 이전에 정신 질환 있던 사람들 제외)
+# a[!(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), ] %>% dim 
 excl <- a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT < Indexdate][order(MDCARE_STRT_DT), .SD[1], .SDcols = c("MDCARE_STRT_DT"), keyby = "INDI_DSCM_NO" ]
 #INDI_DSCM_NO 대신 RN_INDI 써야함
 
@@ -196,13 +197,27 @@ excl <- a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.d
 data.incl <- a[!excl, on = "INDI_DSCM_NO"][,  `:=` (Indexdate = as.Date(as.character(Indexdate), format = "%Y%m%d"),
                                                     INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
 data.incl %>% dim
-#INDI_DSCM_NO 대신 RN_INDI 써야함
+
 
 #t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP | SICK_SYM3 %like% code.DEP | SICK_SYM4 %like% code.DEP | SICK_SYM5 %like% code.DEP, ] %>% dim # drug prescription will be added later
 
 # 치매
-dimentia <- t20[SICK_SYM1 %like% code.dementia]
 
+#수술 후 1년 이후부터 5년 이내 supplementary table 2의 dementia진단 코드를 주 진단명 또는 부 진단명으로 가지고 있으며 
+# Supplementary table 3의 dementia 약제 (Rivastigmine, Galantamine, Memantine, Donepezil)을 2회 이상 처방받은 환자
+dimentia <- t20[SICK_SYM1 %like% code.dementia | SICK_SYM2 %like% code.dementia, .(CMN_KEY, INDI_DSCM_NO, dimen.SICK_SYM1 = SICK_SYM1, dimen.SICK_SYM2 = SICK_SYM2, Dimentia_Date = MDCARE_STRT_DT)]
+
+code.dimentia.drug.named <- with(stack(code.dementia.drug),
+                           setNames(ind, values))
+
+t30.dimentia <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.dimentia.drug.named[MCARE_DIV_CD_ADJ])]
+t60.dimentia <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.dimentia.drug.named[MCARE_DIV_CD_ADJ])]
+
+t.combined.dimentia <- rbind(t30.dimentia, t60.dimentia)
+
+excl.dimentia <- t.combined.dimentia[, .N, by = MCARE_DIV_CD_ADJ][N>=2]
+
+dimentia.filtered <- dimentia[!excl.dimentia]
 
 ## 성별과 사망일 추가
 
