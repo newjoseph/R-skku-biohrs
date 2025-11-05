@@ -1,7 +1,7 @@
-library(haven);library(data.table);library(magrittr);library(fst);library(openxlsx);library(lubridate)
+library(haven);library(data.table);library(magrittr);library(fst);library(openxlsx)
 
 setwd("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study")
-setDTthreads(8)  ## 0: All
+setDTthreads(0)  ## 0: All
 
 
 ## SAS to fst/csv
@@ -135,30 +135,46 @@ t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", 
 ## Previous disease: Among all sick code
 
 ## 2002년 1월부터 2021년 12월까지 심장수술, 위절제술, 대장절제술, 전립선절제술을 받은 자
-code.surgery.named <- unlist(code.surgery)
-names(code.surgery.named) <- gsub("[0-9]", "", names(code.surgery.named))
-code.surgery.named2 <- names(code.surgery.named) 
-names(code.surgery.named2) <- code.surgery.named
+# code.surgery.named <- unlist(code.surgery)
+# names(code.surgery.named) <- gsub("[0-9]", "", names(code.surgery.named))
+# code.surgery.named2 <- names(code.surgery.named) 
+# names(code.surgery.named2) <- code.surgery.named
+# 
+# code.surgery.named <- stack(code.surgery)
+# code.surgery.named
 
-t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named2[MCARE_DIV_CD_ADJ])]
+code.surgery.named <- with(stack(code.surgery),
+                            setNames(ind, values))
+
+
+t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 
 a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
 cat("Total number of subjects:", nrow(a.start))
 
 
-count_by_code <- data[,.(SICK_SYM1),][, .N, by = SICK_SYM1][order(SICK_SYM1)]
+count_by_code <- a.start[,.(MCARE_DIV_CD_ADJ),][, .N, by = MCARE_DIV_CD_ADJ][order(MCARE_DIV_CD_ADJ)]
 cat("각 수술별 환자 수 ")
 print(count_by_code)
 
 ## 우울증 발생
-t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -90]
+# a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
+#   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
+
+a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][
+  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
+
+a.dep.new <- a.dep[!is.na(Indexdate)]
+
+# a.dep.check <- t20[SICK_SYM1 %like% code.DEP  & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][
+#   a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
 
+#만약에 진단명으로 샘플수가 부족한 경우 수술 후 1년 이내 우울증 발생한 것을postoperative depression case의 정의로 변경하여 다시 case를 산출해 볼 예정.
 
 
-
-
-a <- t20[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"]
+# 최초 우울증 발생
+a <- t20[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20221231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"] #2002/01~2021/12/31이 수술이니까 1년 이후에 우울증 발생
 #a <- data[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"]
 #INDI_DSCM_NO 대신 RN_INDI t20 대신 data 써야함.
 
@@ -191,7 +207,7 @@ dimentia <- t20[SICK_SYM1 %like% code.dementia]
 ## 성별과 사망일 추가
 
 data.incl <- data.incl %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
-  .[, `:=` (Age = year(ymd(MDCARE_STRT_DT))-as.integer(BYEAR))] %>% 
+  .[, `:=` (Age = year(as.Date(as.character(MDCARE_STRT_DT), format = "%Y%m%d"))-as.integer(BYEAR))] %>% 
   merge(bnd, by = "INDI_DSCM_NO")
 
 
