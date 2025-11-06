@@ -130,6 +130,16 @@ code.opiode <- list(
   pethidine = c("211530BIJ", "211531BIJ")
 )
 
+# Cardiovascular outcome 
+code.cardiovascular <- list(
+  acute.myocardial.infarction = c(), #급성 심근경색
+  angina.pectoris = c(), #협심증
+  CHF = c() #심부전
+  )
+
+code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
+
+
 t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", as.data.table = T)
 
 ## Previous disease: Among all sick code
@@ -147,10 +157,11 @@ code.surgery.named <- with(stack(code.surgery),
                             setNames(ind, values))
 
 
-t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
+# t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
+t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 
 # a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
-a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
+a.start <- merge(t30.surgery, t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
 cat("Total number of subjects:", nrow(a.start))
 
 
@@ -159,47 +170,74 @@ cat("각 수술별 환자 수 ")
 print(count_by_code)
 
 ## 우울증 발생
+#만약에 진단명으로 샘플수가 부족한 경우 수술 후 1년 이내 우울증 발생한 것을postoperative depression case의 정의로 변경하여 다시 case를 산출해 볼 예정.
+
 # a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
 #   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
-a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][
-  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
+a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
+  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] # 일단은 30일, 샘플수 부족시에 365일로
 
-a.dep.new <- a.dep[!is.na(Indexdate)]
+
+# a.start에서 우울증 있는 사람들만 추출
+a.dep <- a.dep[!is.na(Indexdate)]
+a <- a.dep[!is.na(Indexdate)]
+
+
 
 # a.dep.check <- t20[SICK_SYM1 %like% code.DEP  & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][
 #   a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
 
-#만약에 진단명으로 샘플수가 부족한 경우 수술 후 1년 이내 우울증 발생한 것을postoperative depression case의 정의로 변경하여 다시 case를 산출해 볼 예정.
-
-
-# 최초 우울증 발생
-a <- t20[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20221231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"] #2002/01~2021/12/31이 수술이니까 1년 이후에 우울증 발생
-#a <- data[SICK_SYM1 %like% code.DEP & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231][, Indexdate := min(MDCARE_STRT_DT), keyby = "INDI_DSCM_NO"]
-#INDI_DSCM_NO 대신 RN_INDI t20 대신 data 써야함.
-
-## 정신질환자 제외 (우울증 발생 이전에 정신 질환 있던 사람들 제외)
+## 정신질환자
 # a[!(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), ] %>% dim 
-excl <- a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT < Indexdate][order(MDCARE_STRT_DT), .SD[1], .SDcols = c("MDCARE_STRT_DT"), keyby = "INDI_DSCM_NO" ]
-#INDI_DSCM_NO 대신 RN_INDI 써야함
+# excl.mental <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(INDI_DSCM_NO, Mental_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))]
 
+excl.mental <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(Mental_date = min(as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))), by = INDI_DSCM_NO]
+#excl.mental2 <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(INDI_DSCM_NO, Mental_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][order(Mental_date), .SD[1], .SDcols = c("Mental_date"), keyby = "INDI_DSCM_NO"]
+#[MDCARE_STRT_DT < Indexdate][order(MDCARE_STRT_DT), .SD[1], .SDcols = c("MDCARE_STRT_DT"), keyby = "INDI_DSCM_NO"]
+
+#mental.before.dep <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date < Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
+
+
+# 로직 다시 한 번 확인 필요
+mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date), nomatch = 0L,
+                       .(INDI_DSCM_NO, Surgery_date, Mental_date, Indexdate, CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery, surg.SICK_SYM1, surg.SICK_SYM2)][Mental_date < Indexdate]
+
+# mental.before.dep2 <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date == Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
+# mental.before.dep[Mental_date != Indexdate] %>% dim
 # check code
 # a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT < Indexdate] %>% dim
 # a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT >= Indexdate] %>% dim
 # a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(SICK_SYM1, SICK_SYM2, MDCARE_STRT_DT, Indexdate)]
 
 
-# exclusion applied
-#data.incl <- a[!excl, on = "INDI_DSCM_NO"][, Indexdate := as.Date(as.character(Indexdate), format = "%Y%m%d")]
+# 정신 질환자 exclusion applied
+
+#data.incl <- a[!excl.mental, on = "INDI_DSCM_NO"][, Indexdate := as.Date(as.character(Indexdate), format = "%Y%m%d")]
+# data.incl <- a[!excl.mental, on = "INDI_DSCM_NO"][,  `:=` (Indexdate = as.Date(as.character(Indexdate), format = "%Y%m%d"),
+#                                                     INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
+# data.incl %>% dim
+
+a <- a[!mental.before.dep, on = "INDI_DSCM_NO"][,  `:=` (INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
+a %>% head
 
 
-data.incl <- a[!excl, on = "INDI_DSCM_NO"][,  `:=` (Indexdate = as.Date(as.character(Indexdate), format = "%Y%m%d"),
-                                                    INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
-data.incl %>% dim
+# 과거력 5년 제외 (대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외)
+past.history <- t20[SICK_SYM1 %in% excl.code.disease | SICK_SYM2 %in% excl.code.disease | SICK_SYM3 %in% excl.code.disease| SICK_SYM4 %in% excl.code.disease| SICK_SYM5 %in% excl.code.disease,
+                    .(INDI_DSCM_NO = as.numeric(INDI_DSCM_NO), Disease_date = as.Date(MDCARE_STRT_DT, "%Y%m%d"))]
+
+a[, Surgery_date_minus5yr := Surgery_date - 365.25*5]
+
+past.5yr <- past.history[a, on = .(INDI_DSCM_NO, Disease_date < Surgery_date, Disease_date > Surgery_date_minus5yr), nomatch = 0L]
+past.5yr %>% head
 
 
-#t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP | SICK_SYM3 %like% code.DEP | SICK_SYM4 %like% code.DEP | SICK_SYM5 %like% code.DEP, ] %>% dim # drug prescription will be added later
+a <- a[!past.5yr, on = "INDI_DSCM_NO"]
+
+### data preprocessing done ###
+
+
 
 # 치매
 
@@ -214,10 +252,20 @@ t30.dimentia <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY 
 t60.dimentia <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.dimentia.drug.named[MCARE_DIV_CD_ADJ])]
 
 t.combined.dimentia <- rbind(t30.dimentia, t60.dimentia)
+t.combined.dimentia
 
-excl.dimentia <- t.combined.dimentia[, .N, by = MCARE_DIV_CD_ADJ][N>=2]
+excl.dimentia <- t.combined.dimentia[, N := .N, by = .(CMN_KEY, MCARE_DIV_CD_ADJ)][N>=2]
+t.combined.dimentia
 
-dimentia.filtered <- dimentia[!excl.dimentia]
+
+dimentia.filtered <- dimentia[!excl.dimentia, on = "CMN_KEY"]
+
+
+
+
+
+
+
 
 ## 성별과 사망일 추가
 
@@ -226,7 +274,8 @@ data.incl <- data.incl %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1
   merge(bnd, by = "INDI_DSCM_NO")
 
 
-t60 %>% head
+
+
 t60[MCARE_DIV_CD_ADJ %in% unlist(code.opiode), MCARE_DIV_CD_ADJ] %>% unique 
 
 
@@ -242,35 +291,8 @@ m20 <- m20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP | SICK_SYM3 %li
 
 
 
-data <- read_excel("약제급여목록및급여상한금액표_(2025.11.1.)(21,685)_공개용(개정안)_수정 1부.xlsx") %>% as.data.table()
+#data <- read_excel("약제급여목록및급여상한금액표_(2025.11.1.)(21,685)_공개용(개정안)_수정 1부.xlsx") %>% as.data.table()
 
 
-m40 %>% head
-
-m40$SICK_CLSF_TYPE %>% unique
-m40$MCEX_SICK_SYM %>% unique
-
-m20$SICK_SYM1 %>% unique %>% sort
-
-code.DEP <- paste(paste0("F", 32:34), collapse = "|")
-a <- m20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP,] # drug prescription will be added later
-
-a[SICK_SYM1 %in% code.DEP, .(SICK_SYM1)]
-
-# 
-a <- m20[SICK_SYM1 %in% c("F32", "F33", "F34", "F_") ,] # remove F_ later
-
-
-a <- m20 %>% 
-  .[OPRTN_YN == 9] #%>% # Operation yes
-
-
-surgery <- m40
-
-# 수술
-m30$MCARE_DIV_CD
-  
-
-code.depression <- c()
 
 
