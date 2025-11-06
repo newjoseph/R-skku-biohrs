@@ -162,12 +162,19 @@ t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_
 
 # a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
 a.start <- merge(t30.surgery, t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
-cat("Total number of subjects:", nrow(a.start))
+
+attr <- list("Total number of subjects:" = nrow(a.start))
+
+#cat("Total number of subjects:", nrow(a.start))
+#rm(t30.surgery)
+
 
 
 count_by_code <- a.start[,.(MCARE_DIV_CD_ADJ),][, .N, by = MCARE_DIV_CD_ADJ][order(MCARE_DIV_CD_ADJ)]
 cat("각 수술별 환자 수 ")
 print(count_by_code)
+
+attr$`각 수술별 환자 수` <- count_by_code
 
 ## 우울증 발생
 #만약에 진단명으로 샘플수가 부족한 경우 수술 후 1년 이내 우울증 발생한 것을postoperative depression case의 정의로 변경하여 다시 case를 산출해 볼 예정.
@@ -176,17 +183,15 @@ print(count_by_code)
 #   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
 a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
-  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] # 일단은 30일, 샘플수 부족시에 365일로
+  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] %>% # 일단은 30일, 샘플수 부족시에 365일로
+  .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
 
 
-# a.start에서 우울증 있는 사람들만 추출
-a.dep <- a.dep[!is.na(Indexdate)]
-a <- a.dep[!is.na(Indexdate)]
+attr$`Exclusion1 :우울증 환자만` <- a.dep
 
+a <- copy(a.dep)
+#rm(a.dep)
 
-
-# a.dep.check <- t20[SICK_SYM1 %like% code.DEP  & MDCARE_STRT_DT >=20020101 & MDCARE_STRT_DT <= 20211231, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][
-#   a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
 
 ## 정신질환자
@@ -203,6 +208,8 @@ excl.mental <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code
 # 로직 다시 한 번 확인 필요
 mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date), nomatch = 0L,
                        .(INDI_DSCM_NO, Surgery_date, Mental_date, Indexdate, CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery, surg.SICK_SYM1, surg.SICK_SYM2)][Mental_date < Indexdate]
+attr$`이전의 정신질환자 수` <- mental.before.dep
+#rm(excl.mental)
 
 # mental.before.dep2 <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date == Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
 # mental.before.dep[Mental_date != Indexdate] %>% dim
@@ -214,13 +221,13 @@ mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date
 
 # 정신 질환자 exclusion applied
 
-#data.incl <- a[!excl.mental, on = "INDI_DSCM_NO"][, Indexdate := as.Date(as.character(Indexdate), format = "%Y%m%d")]
-# data.incl <- a[!excl.mental, on = "INDI_DSCM_NO"][,  `:=` (Indexdate = as.Date(as.character(Indexdate), format = "%Y%m%d"),
-#                                                     INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
-# data.incl %>% dim
 
 a <- a[!mental.before.dep, on = "INDI_DSCM_NO"][,  `:=` (INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
+attr$`Exclusion2: 정신질환자 제외 후` <- a
+
 a[, Surgery_date_minus5yr := Surgery_date - 365*5]
+
+#rm(mental.before.dep)
 
 a %>% head
 
@@ -245,24 +252,35 @@ past.5yr %>% head
 
 
 a <- a[!past.5yr, on = "INDI_DSCM_NO"]
-
+attr$`Exclusion3: 과거력 5년 제외 후` <- a
 
 a[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
 
 
 ## 성별과 사망일 추가
 
-t <- a %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
+setkey(bfc, INDI_DSCM_NO)
+setkey(bnd, INDI_DSCM_NO)
+t <- a %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), by = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
   .[, `:=` (Age = year(Indexdate)-as.integer(BYEAR))] %>% 
   merge(bnd[, .(INDI_DSCM_NO, DTH_ASSMD_DT = as.Date(DTH_ASSMD_DT, "%Y%m%d"))], by = "INDI_DSCM_NO", all.x=T)
 
-#t[, `:=` (mortality_1yr = , )]
+rm(bfc)
+rm(bnd)
+
+
+# t <- a %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
+#   .[, `:=` (Age = year(Indexdate)-as.integer(BYEAR))] %>% 
+#   merge(bnd[, .(INDI_DSCM_NO, DTH_ASSMD_DT = as.Date(DTH_ASSMD_DT, "%Y%m%d"))], by = "INDI_DSCM_NO", all.x=T)
 
 
 a.heart <- a[Type_surgery == "heart",]
 a.other.major <- a[Type_surgery != "heart",]
 
-
+attr$`Heart surgery` <- a.heart
+attr$`Heart surgery N: ` <- nrow(a.heart)
+attr$`Other major surgery` <- a.other.major
+attr$`Other major surgery N: ` <- nrow( a.other.major)
 ### data preprocessing done ###
 
 
