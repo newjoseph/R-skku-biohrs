@@ -220,20 +220,48 @@ mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date
 # data.incl %>% dim
 
 a <- a[!mental.before.dep, on = "INDI_DSCM_NO"][,  `:=` (INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
+a[, Surgery_date_minus5yr := Surgery_date - 365*5]
+
 a %>% head
+
 
 
 # 과거력 5년 제외 (대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외)
 past.history <- t20[SICK_SYM1 %in% excl.code.disease | SICK_SYM2 %in% excl.code.disease | SICK_SYM3 %in% excl.code.disease| SICK_SYM4 %in% excl.code.disease| SICK_SYM5 %in% excl.code.disease,
                     .(INDI_DSCM_NO = as.numeric(INDI_DSCM_NO), Disease_date = as.Date(MDCARE_STRT_DT, "%Y%m%d"))]
+past.history %>% head 
 
-a[, Surgery_date_minus5yr := Surgery_date - 365.25*5]
+
+## 확인 t40으로 만들기 
+# past.history.40 <- t40[MCEX_SICK_SYM %in% excl.code.disease] %>% merge(t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Disease_date = as.Date(MDCARE_STRT_DT, "%Y%m%d"))], by = "CMN_KEY")
+# past.history.40 %>% head
+# past.history.40[is.na(MDCARE_STRT_DT)] %>% dim
+# past.5yr.40 <- past.history.40[a, on = .(CMN_KEY, Disease_date < Surgery_date, Disease_date > Surgery_date_minus5yr), nomatch = 0L]
+# past.5yr.40 %>% dim
+
 
 past.5yr <- past.history[a, on = .(INDI_DSCM_NO, Disease_date < Surgery_date, Disease_date > Surgery_date_minus5yr), nomatch = 0L]
 past.5yr %>% head
 
 
 a <- a[!past.5yr, on = "INDI_DSCM_NO"]
+
+
+a[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
+
+
+## 성별과 사망일 추가
+
+t <- a %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
+  .[, `:=` (Age = year(Indexdate)-as.integer(BYEAR))] %>% 
+  merge(bnd[, .(INDI_DSCM_NO, DTH_ASSMD_DT = as.Date(DTH_ASSMD_DT, "%Y%m%d"))], by = "INDI_DSCM_NO", all.x=T)
+
+#t[, `:=` (mortality_1yr = , )]
+
+
+a.heart <- a[Type_surgery == "heart",]
+a.other.major <- a[Type_surgery != "heart",]
+
 
 ### data preprocessing done ###
 
@@ -266,12 +294,6 @@ dimentia.filtered <- dimentia[!excl.dimentia, on = "CMN_KEY"]
 
 
 
-
-## 성별과 사망일 추가
-
-data.incl <- data.incl %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
-  .[, `:=` (Age = year(as.Date(as.character(MDCARE_STRT_DT), format = "%Y%m%d"))-as.integer(BYEAR))] %>% 
-  merge(bnd, by = "INDI_DSCM_NO")
 
 
 
