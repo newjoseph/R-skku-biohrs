@@ -140,7 +140,7 @@ code.cardiovascular <- list(
 code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
 
 
-t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", as.data.table = T)
+# t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", as.data.table = T)
 
 ## Previous disease: Among all sick code
 
@@ -160,10 +160,19 @@ code.surgery.named <- with(stack(code.surgery),
 # t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 
+#write_fst(t30.surgery, file.path("data", "t30_surgery.fst"))
+read_fst("data/t30_surgery.fst", as.data.table = T)
+
 # a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
 a.start <- merge(t30.surgery, t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
 
+#write_fst(a.start, file.path("data", "a_start.fst"))
+a.start <- read_fst("data/a_start.fst", as.data.table = T)
+
 attr <- list("Total number of subjects:" = nrow(a.start))
+
+
+
 
 #cat("Total number of subjects:", nrow(a.start))
 #rm(t30.surgery)
@@ -187,6 +196,9 @@ a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(M
   .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
 
 
+#write_fst(a.dep, file.path("data", "a_dep.fst"))
+a.dep <- read_fst("data/a_dep.fst", as.data.table = T)
+
 attr$`Exclusion1 :우울증 환자만` <- a.dep
 
 a <- copy(a.dep)
@@ -202,6 +214,9 @@ excl.mental <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code
 #excl.mental2 <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(INDI_DSCM_NO, Mental_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))][order(Mental_date), .SD[1], .SDcols = c("Mental_date"), keyby = "INDI_DSCM_NO"]
 #[MDCARE_STRT_DT < Indexdate][order(MDCARE_STRT_DT), .SD[1], .SDcols = c("MDCARE_STRT_DT"), keyby = "INDI_DSCM_NO"]
 
+#write_fst(excl.mental, file.path("data", "excl_mental.fst"))
+excl.mental <- read_fst("data/excl_mental.fst", as.data.table = T)
+
 #mental.before.dep <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date < Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
 
 
@@ -209,6 +224,10 @@ excl.mental <- t20[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code
 mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date), nomatch = 0L,
                        .(INDI_DSCM_NO, Surgery_date, Mental_date, Indexdate, CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery, surg.SICK_SYM1, surg.SICK_SYM2)][Mental_date < Indexdate]
 attr$`이전의 정신질환자 수` <- mental.before.dep
+
+#write_fst(mental.before.dep, file.path("data", "mental_before_dep.fst"))
+mental.before.dep <- read_fst("data/mental_before_dep.fst", as.data.table = T)
+
 #rm(excl.mental)
 
 # mental.before.dep2 <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date == Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
@@ -269,6 +288,15 @@ rm(bfc)
 rm(bnd)
 
 
+## 여기에 merged data
+
+
+#write_fst(t, file.path("data", "merged.fst"))
+t <- read_fst("data/merged.fst", as.data.table = T)
+#a <- read_fst("data/merged.fst", as.data.table = T)
+
+
+
 # t <- a %>% merge(bfc[, .(SEX_TYPE = SEX_TYPE[1], BYEAR = BYEAR[1]), keyby = "INDI_DSCM_NO"], by = "INDI_DSCM_NO", all.x = T) %>%
 #   .[, `:=` (Age = year(Indexdate)-as.integer(BYEAR))] %>% 
 #   merge(bnd[, .(INDI_DSCM_NO, DTH_ASSMD_DT = as.Date(DTH_ASSMD_DT, "%Y%m%d"))], by = "INDI_DSCM_NO", all.x=T)
@@ -289,22 +317,129 @@ attr$`Other major surgery N: ` <- nrow( a.other.major)
 
 #수술 후 1년 이후부터 5년 이내 supplementary table 2의 dementia진단 코드를 주 진단명 또는 부 진단명으로 가지고 있으며 
 # Supplementary table 3의 dementia 약제 (Rivastigmine, Galantamine, Memantine, Donepezil)을 2회 이상 처방받은 환자
-dimentia <- t20[SICK_SYM1 %like% code.dementia | SICK_SYM2 %like% code.dementia, .(CMN_KEY, INDI_DSCM_NO, dimen.SICK_SYM1 = SICK_SYM1, dimen.SICK_SYM2 = SICK_SYM2, Dimentia_Date = MDCARE_STRT_DT)]
+dimentia <- t20[
+  SICK_SYM1 %like% code.dementia | SICK_SYM2 %like% code.dementia,
+  .(
+    CMN_KEY = as.character(CMN_KEY),
+    INDI_DSCM_NO = as.integer(INDI_DSCM_NO),
+    dimen.SICK_SYM1 = SICK_SYM1,
+    dimen.SICK_SYM2 = SICK_SYM2,
+    Dimentia_Date = as.Date(MDCARE_STRT_DT, "%Y%m%d")
+  )
+]
 
-code.dimentia.drug.named <- with(stack(code.dementia.drug),
-                           setNames(ind, values))
+code.dimentia.drug.named <- with(
+  stack(code.dementia.drug),
+  setNames(ind, values)
+)
 
 t30.dimentia <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.dimentia.drug.named[MCARE_DIV_CD_ADJ])]
 t60.dimentia <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.dimentia.drug.named[MCARE_DIV_CD_ADJ])]
 
 t.combined.dimentia <- rbind(t30.dimentia, t60.dimentia)
 t.combined.dimentia
+#write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
 
-excl.dimentia <- t.combined.dimentia[, N := .N, by = .(CMN_KEY, MCARE_DIV_CD_ADJ)][N>=2]
-t.combined.dimentia
+#write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
+dimentia <- read_fst("data/t20_dimentia.fst", as.data.table = T)[
+  ,
+  `:=`(
+    CMN_KEY = as.character(CMN_KEY),
+    INDI_DSCM_NO = as.integer(INDI_DSCM_NO),
+    Dimentia_Date = as.Date(Dimentia_Date, "%Y%m%d")
+  )
+]
 
 
-dimentia.filtered <- dimentia[!excl.dimentia, on = "CMN_KEY"]
+
+# dementia.med.raw <- rbindlist(
+#   list(
+#     t30[
+#       MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug),
+#       .(
+#         CMN_KEY = as.character(CMN_KEY),
+#         MCARE_DIV_CD_ADJ,
+#         Type_drug = code.dementia.drug.named[MCARE_DIV_CD_ADJ]
+#       )
+#     ],
+#     t60[
+#       MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug),
+#       .(
+#         CMN_KEY = as.character(CMN_KEY),
+#         MCARE_DIV_CD_ADJ,
+#         Type_drug = code.dementia.drug.named[MCARE_DIV_CD_ADJ]
+#       )
+#     ]
+#   ),
+#   use.names = TRUE
+# )
+
+#write_fst(t.combined.dimentia, file.path("data", "t30_60_dimentia.fst"))
+t.combined.dimentia <- read_fst("data/t30_60_dimentia.fst", as.data.table = T)
+# dementia.med.raw <- read_fst("data/t30_60_dimentia.fst", as.data.table = T)
+
+# t.combined.dimentia[, `:=`(
+#   CMN_KEY = as.character(CMN_KEY),
+#   MCARE_DIV_CD_ADJ = as.character(MCARE_DIV_CD_ADJ),
+#   Type_drug = as.character(Type_drug)
+# )]
+
+dementia.med <- t.combined.dimentia[
+  dimentia[
+    ,
+    .(
+      CMN_KEY = as.character(CMN_KEY),
+      INDI_DSCM_NO = as.integer(INDI_DSCM_NO),
+      Drug_Date = as.Date(MDCARE_STRT_DT, "%Y%m%d")
+    )
+  ],
+  on = "CMN_KEY",
+  nomatch = 0L
+][
+  a[, .(INDI_DSCM_NO, Surgery_after_1y, Surgery_after_5y)],
+  on = .(INDI_DSCM_NO),
+  nomatch = 0L
+][Drug_Date >= Surgery_after_1y & Drug_Date <= Surgery_after_5y]
+
+dementia.med.unique <- unique(dementia.med, by = c("INDI_DSCM_NO", "CMN_KEY", "Drug_Date"))
+dementia.med.count <- dementia.med.unique[, .N, by = INDI_DSCM_NO][N >= 2]
+
+dementia.dx <- dimentia[
+  a[, .(INDI_DSCM_NO, Surgery_after_1y, Surgery_after_5y)],
+  on = .(INDI_DSCM_NO),
+  nomatch = 0L
+][Dimentia_Date >= Surgery_after_1y & Dimentia_Date <= Surgery_after_5y]
+
+dementia.cohort <- dementia.dx[dementia.med.count, on = "INDI_DSCM_NO", nomatch = 0L]
+
+# Exclude Alzheimer disease diagnoses occurring before or within 1 year after depression diagnosis.
+code.alzheimer <- paste0(c("F00", "G30"), collapse = "|")
+alzheimer <- t20[
+  SICK_SYM1 %like% code.alzheimer | SICK_SYM2 %like% code.alzheimer,
+  .(
+    INDI_DSCM_NO = as.integer(INDI_DSCM_NO),
+    AD_Date = as.Date(MDCARE_STRT_DT, "%Y%m%d")
+  )
+][!is.na(AD_Date)]
+
+alzheimer_before_dep <- alzheimer[
+  a[, .(INDI_DSCM_NO, Indexdate)],
+  on = .(INDI_DSCM_NO),
+  nomatch = 0L
+][AD_Date < Indexdate, .(INDI_DSCM_NO)]
+
+alzheimer_within_1y <- alzheimer[
+  a[, .(INDI_DSCM_NO, Indexdate)],
+  on = .(INDI_DSCM_NO),
+  nomatch = 0L
+][AD_Date >= Indexdate & AD_Date <= Indexdate + 365, .(INDI_DSCM_NO)]
+
+alzheimer_exclude <- unique(rbindlist(list(alzheimer_before_dep, alzheimer_within_1y)))
+
+dementia.cohort <- dementia.cohort[!alzheimer_exclude, on = "INDI_DSCM_NO"]
+
+attr$`Dementia cohort` <- dementia.cohort
+attr$`Dementia cohort N` <- nrow(dementia.cohort)
 
 
 
@@ -318,21 +453,4 @@ dimentia.filtered <- dimentia[!excl.dimentia, on = "CMN_KEY"]
 
 t60[MCARE_DIV_CD_ADJ %in% unlist(code.opiode), MCARE_DIV_CD_ADJ] %>% unique 
 
-
-#m20[SICK_SYM1 %like% "F" | SICK_SYM2 %like% "F" | SICK_SYM3 %like% "F"| SICK_SYM4 %like% "F"| SICK_SYM5 %like% "F"]
-# write_fst(m20[SICK_SYM1 %like% "F" | SICK_SYM2 %like% "F" | SICK_SYM3 %like% "F"| SICK_SYM4 %like% "F"| SICK_SYM5 %like% "F"], file.path("study/data", "m20.fst"))
-
-
-
-#m20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, SICK_SYM3 %like% code.DEP | SICK_SYM4 %like% code.DEP, SICK_SYM5 %like% code.DEP] %>% dim
-m20 <- m20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP | SICK_SYM3 %like% code.DEP | SICK_SYM4 %like% code.DEP | SICK_SYM5 %like% code.DEP, ] # drug prescription will be added later
-# a$SICK_SYM1 %>% unique %>% sort
-# a[SICK_SYM1 %like% code.DEP, SICK_SYM1] %>% unique %>% sort
-
-
-
 #data <- read_excel("약제급여목록및급여상한금액표_(2025.11.1.)(21,685)_공개용(개정안)_수정 1부.xlsx") %>% as.data.table()
-
-
-
-
