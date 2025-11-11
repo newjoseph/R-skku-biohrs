@@ -40,6 +40,20 @@ g1e_2017 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2017.csv") %>% as.dat
 # depression
 code.DEP <- paste(paste0("F", 32:34), collapse = "|")
 
+## Supp 2 확인필요 교수님 정의 필요. 아래 항목은 무관
+code.dep.list <- list(
+  Attention = paste0(c("F90.0", "Z43", "Z48.0"), collapse = "|"),
+  Memory = c("G20"),
+  Visuoconstruction  = c("I60", "I61", "I62", "I63", "I64"),
+  VerbalFfluency = c("S06"),
+  Processing_Speed <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|"),
+  Executive_Function = c("G20"),
+  Fine_Motor_Speed  = c("I60", "I61", "I62", "I63", "I64")
+)
+
+# 교수님 확인후 추가 필요 
+code.dep.drug <- list()
+
 # exclude diseases
 excl.code.disease <- list(
   dementia = c("G20"),
@@ -293,6 +307,9 @@ rm(bnd)
 
 #write_fst(t, file.path("data", "merged.fst"))
 t <- read_fst("data/merged.fst", as.data.table = T)
+t <- t[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
+t <- t[Age>=18, ]
+attr$`Inclusion 1: Age >=18 :` <-  nrow(t)
 #a <- read_fst("data/merged.fst", as.data.table = T)
 
 
@@ -338,7 +355,7 @@ t60.dimentia <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug), .(CMN_KEY 
 
 t.combined.dimentia <- rbind(t30.dimentia, t60.dimentia)
 t.combined.dimentia
-#write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
+#write_fst(t.combined.dimentia, file.path("data", "t30_60_dimentia.fst"))
 
 #write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
 dimentia <- read_fst("data/t20_dimentia.fst", as.data.table = T)[
@@ -390,7 +407,7 @@ dementia.med <- t.combined.dimentia[
     .(
       CMN_KEY = as.character(CMN_KEY),
       INDI_DSCM_NO = as.integer(INDI_DSCM_NO),
-      Drug_Date = as.Date(MDCARE_STRT_DT, "%Y%m%d")
+      Drug_Date = as.Date(Dimentia_Date, "%Y%m%d")
     )
   ],
   on = "CMN_KEY",
@@ -410,7 +427,17 @@ dementia.dx <- dimentia[
   nomatch = 0L
 ][Dimentia_Date >= Surgery_after_1y & Dimentia_Date <= Surgery_after_5y]
 
+a$Dimentia = 0
+
+a <- dimentia[a, on = .(INDI_DSCM_NO), nomatch = 0L ][Dimentia_Date >= Surgery_after_1y & Dimentia_Date <= Surgery_after_5y, Dimentia := 1]
+
+
 dementia.cohort <- dementia.dx[dementia.med.count, on = "INDI_DSCM_NO", nomatch = 0L]
+
+
+
+## 여기서부터 다시 본다. 
+
 
 # Exclude Alzheimer disease diagnoses occurring before or within 1 year after depression diagnosis.
 code.alzheimer <- paste0(c("F00", "G30"), collapse = "|")
