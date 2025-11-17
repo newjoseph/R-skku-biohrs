@@ -52,7 +52,38 @@ code.dep.list <- list(
 )
 
 # 교수님 확인후 추가 필요 
-code.dep.drug <- list()
+code.dep.drug <- list(
+  # 예시일 뿐 
+  escitalopram = c( #'제품코드
+    "651903320","643904070","653006400","642404280","657203640",
+    "645305630","642706520","642505820","642004140","651602520",
+    "694001740","653404070","645405120","657807270","657307740",
+    "647204870","628901550","073001140","647804660","668000010",
+    "671705600","643305000","642802330","645406340","651905310",
+    "643904030","651902560","642402040","653004430","657203650",
+    "643802930","640004880","649804370","642505810","694001360",
+    "645304650","652606140","645405130","649505850","651602530",
+    "642704470","653404060","642001670","693901750","657307730",
+    "671702330","689000540","670701290","669805540","669501970",
+    "661904390","657807280","649103080","649002010","647204860",
+    "646002900","628901560","073001420","055800190","668000020",
+    "647802910","642801900","643504370","647301590","648102570",
+    "643305040","645406320","651905320","649508040","651903550",
+    "643904060","653404650","642403290","645305060","657203630",
+    "645405140","653005320","642705770","652606090","671703430",
+    "642003450","694001370","657307720","669501940","628901570",
+    "073001430","647804500","668000050","645406330","651905330",
+    "651903850","643904050","653006860","642005310","657203220",
+    "668000070"
+  ),
+  sertraline = c(
+    "653006560","651902160","642404370","668100100","642005160",
+    "657203270","073400310","643501290","649807070","651903750",
+    "653006640","668101160","642404380","642005150","657203280",
+    "073400320","653006630","657204130","642404390","642005140",
+    "651905250"
+  )
+)
 
 # exclude diseases
 excl.code.disease <- list(
@@ -205,6 +236,24 @@ attr$`각 수술별 환자 수` <- count_by_code
 # a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
 #   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
+
+
+t60[MCARE_DIV_CD_ADJ %in% escitalopram_ids] %>% dim()
+
+code.depression.drug.named <- with(
+  stack(code.dep.drug),
+  setNames(ind, values)
+)
+
+t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+
+t.combined.dep <- rbind(t30.dep, t60.dep)
+t.combined.dep
+#write_fst(t.combined.dep, file.path("data", "t_combined_dep.fst"))
+t.combined.dep <- read_fst("data/t_combined_dep.fst", as.data.table = T)
+
+    
 a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
   a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] %>% # 일단은 30일, 샘플수 부족시에 365일로
   .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
