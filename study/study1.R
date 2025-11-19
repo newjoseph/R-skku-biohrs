@@ -11,29 +11,29 @@ setDTthreads(0)  ## 0: All
 #     #fwrite(file.path("data", paste0("nsc2_", v, "_1000.csv")))
 # }
 
-
-## fst
-# inst <- read_fst("data/nsc2_inst_1000.fst", as.data.table = T)
-# bnc <- read_fst("data/nsc2_bnc_1000.fst", as.data.table = T)
-# bnd <- read_fst("data/nsc2_bnd_1000.fst", as.data.table = T)
-# t20 <- read_fst("data/nsc2_m20_1000.fst", as.data.table = T)
-# t30 <- read_fst("data/nsc2_m30_1000.fst", as.data.table = T)
-# t40 <- read_fst("data/nsc2_m40_1000.fst", as.data.table = T)
-# t60 <- read_fst("data/nsc2_m60_1000.fst", as.data.table = T)
-# g1e_0915 <- read_fst("data/nsc2_g1e_0915_1000.fst", as.data.table = T)
-
-inst <- read_fst("/home/minhyuk.kim/knhis_data/INST.fst", as.data.table = T)
-bfc <- read_fst("/home/minhyuk.kim/knhis_data/BFC.fst", as.data.table = T)
-bnd <- read_fst("/home/minhyuk.kim/knhis_data/DTH.fst", as.data.table = T)
-# t20 <- read_fst("/home/minhyuk.kim/knhis_data/T20.fst", as.data.table = T)
-t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
-#t40 <- read_fst("/home/minhyuk.kim/knhis_data/T40.fst", as.data.table = T)
-t60 <- read_fst("/home/minhyuk.kim/knhis_data/T60.fst", as.data.table = T)
-# g1e_2002 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2002.csv") %>% as.data.table()
+# t20 <- read.csv("data/NSC2_M20_1619.CSV") %>%  as.data.table()
+# ## fst
+# # inst <- read_fst("data/nsc2_inst_1000.fst", as.data.table = T)
+# # bnc <- read_fst("data/nsc2_bnc_1000.fst", as.data.table = T)
+# # bnd <- read_fst("data/nsc2_bnd_1000.fst", as.data.table = T)
+# # t20 <- read_fst("data/nsc2_m20_1000.fst", as.data.table = T)
+# # t30 <- read_fst("data/nsc2_m30_1000.fst", as.data.table = T)
+# # t40 <- read_fst("data/nsc2_m40_1000.fst", as.data.table = T)
+# # t60 <- read_fst("data/nsc2_m60_1000.fst", as.data.table = T)
+# # g1e_0915 <- read_fst("data/nsc2_g1e_0915_1000.fst", as.data.table = T)
+# 
+# inst <- read_fst("/home/minhyuk.kim/knhis_data/INST.fst", as.data.table = T)
+# bfc <- read_fst("/home/minhyuk.kim/knhis_data/BFC.fst", as.data.table = T)
+# bnd <- read_fst("/home/minhyuk.kim/knhis_data/DTH.fst", as.data.table = T)
+# # t20 <- read_fst("/home/minhyuk.kim/knhis_data/T20.fst", as.data.table = T)
+# t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
+# #t40 <- read_fst("/home/minhyuk.kim/knhis_data/T40.fst", as.data.table = T)
+# t60 <- read_fst("/home/minhyuk.kim/knhis_data/T60.fst", as.data.table = T)
+# # g1e_2002 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2002.csv") %>% as.data.table()
+# # g1e_2017 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2017.csv") %>% as.data.table()
+# g1e_2018 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_rst_2018.csv") %>% as.data.table()
+# 
 # g1e_2017 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2017.csv") %>% as.data.table()
-g1e_2018 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_rst_2018.csv") %>% as.data.table()
-
-g1e_2017 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2017.csv") %>% as.data.table()
 
 
 
@@ -42,13 +42,14 @@ code.DEP <- paste(paste0("F", 32:34), collapse = "|")
 
 ## Supp 2 확인필요 교수님 정의 필요. 아래 항목은 무관
 code.dep.list <- list(
-  Attention = paste0(c("F90.0", "Z43", "Z48.0"), collapse = "|"),
-  Memory = c("G20"),
-  Visuoconstruction  = c("I60", "I61", "I62", "I63", "I64"),
-  VerbalFfluency = c("S06"),
-  Processing_Speed <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|"),
-  Executive_Function = c("G20"),
-  Fine_Motor_Speed  = c("I60", "I61", "I62", "I63", "I64")
+  depression = paste0("F", 32:34)
+  # Attention = paste0(c("F90.0", "Z43", "Z48.0"), collapse = "|"),
+  # Memory = c("G20"),
+  # Visuoconstruction  = c("I60", "I61", "I62", "I63", "I64"),
+  # VerbalFfluency = c("S06"),
+  # Processing_Speed <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|"),
+  # Executive_Function = c("G20"),
+  # Fine_Motor_Speed  = c("I60", "I61", "I62", "I63", "I64")
 )
 
 # 교수님 확인후 추가 필요 
@@ -233,34 +234,79 @@ attr$`각 수술별 환자 수` <- count_by_code
 ## 우울증 발생
 #만약에 진단명으로 샘플수가 부족한 경우 수술 후 1년 이내 우울증 발생한 것을postoperative depression case의 정의로 변경하여 다시 case를 산출해 볼 예정.
 
-# a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
+# a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
 #   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
 
-
-
-t60[MCARE_DIV_CD_ADJ %in% escitalopram_ids] %>% dim()
 
 code.depression.drug.named <- with(
   stack(code.dep.drug),
   setNames(ind, values)
 )
 
-t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
-t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+
+
+t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
 
 t.combined.dep <- rbind(t30.dep, t60.dep)
 t.combined.dep
 #write_fst(t.combined.dep, file.path("data", "t_combined_dep.fst"))
 t.combined.dep <- read_fst("data/t_combined_dep.fst", as.data.table = T)
+t.combined.dep[, CMN_KEY := as.numeric(CMN_KEY)]
+setkey(t.combined.dep, CMN_KEY)
 
     
-a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
-  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] %>% # 일단은 30일, 샘플수 부족시에 365일로
-  .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
+# a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
+#   a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] %>% # 일단은 365일로 (실제 데이터에서는 30일로 해보고 부족하면 다시 365일로)
+#   # .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
 
+
+a.dep.diag <- t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY_dep = CMN_KEY, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)][
+  a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365] # 일단은 365일로 (실제 데이터에서는 30일로 해보고 부족하면 다시 365일로)
+
+#write_fst(a.dep.diag, file.path("data", "a_dep_diag.fst"))
+a.dep.diag <- read_fst("data/a_dep_diag.fst", as.data.table = T)  
+
+# dep.id <- a.dep.diag$CMN_KEY %>% unique %>% sort
+# drug.dep.id <- t.combined.dep$CMN_KEY %>% unique %>% sort
+# dep.id[dep.id %in% drug.dep.id]
+
+
+#a.dep.drug <- t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)]
+setkey(t.combined.dep, CMN_KEY)
+
+t20_sub <- t20[, .(INDI_DSCM_NO, CMN_KEY = as.numeric(CMN_KEY), Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), drug.SICK_SYM1 = SICK_SYM1, drug.SICK_SYM2 = SICK_SYM1)]
+rm(t20)
+setkey(t20_sub, CMN_KEY)
+
+
+
+a.dep.drug <- merge(t.combined.dep, t20_sub, by = "CMN_KEY")
+# write_fst(a.dep.drug, file.path("data", "a_dep_drug.fst"))
+a.dep.drug[ .(INDI_DSCM_NO, CMN_KEY, drug_MCARE_DIV_CD_ADJ = MCARE_DIV_CD_ADJ)]
+a.dep.drug <- read_fst("data/a_dep_drug.fst", as.data.table = T)
+
+a.dep.drug[, drug_cutoff := Drug_date - 365]        # Drug_date - 365일
+setkey(a.dep.diag, INDI_DSCM_NO, Surgery_date)
+setkey(a.dep.drug, INDI_DSCM_NO, drug_cutoff)
+
+
+a.dep.final <- a.dep.diag[a.dep.drug, on = .(INDI_DSCM_NO, Surgery_date <= drug_cutoff), nomatch = 0L]
+# write_fst(a.dep.final, file.path("data", "a_dep_final.fst"))
+a.dep.final <- read_fst("data/a_dep_final.fst", as.data.table = T)
+
+
+
+
+
+
+
+
+
+.[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
 
 #write_fst(a.dep, file.path("data", "a_dep.fst"))
-a.dep <- read_fst("data/a_dep.fst", as.data.table = T)
+# a.dep <- read_fst("data/a_dep.fst", as.data.table = T)
 
 attr$`Exclusion1 :우울증 환자만` <- a.dep
 
