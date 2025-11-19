@@ -272,6 +272,10 @@ a.dep.diag <- read_fst("data/a_dep_diag.fst", as.data.table = T)
 # dep.id[dep.id %in% drug.dep.id]
 
 
+## 이전 정의 
+####################################################################
+
+
 #a.dep.drug <- t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)]
 setkey(t.combined.dep, CMN_KEY)
 
@@ -283,35 +287,43 @@ setkey(t20_sub, CMN_KEY)
 
 a.dep.drug <- merge(t.combined.dep, t20_sub, by = "CMN_KEY")
 # write_fst(a.dep.drug, file.path("data", "a_dep_drug.fst"))
-a.dep.drug[ .(INDI_DSCM_NO, CMN_KEY, drug_MCARE_DIV_CD_ADJ = MCARE_DIV_CD_ADJ)]
 a.dep.drug <- read_fst("data/a_dep_drug.fst", as.data.table = T)
+a.dep.drug[, `:=` (CMN_KEY_drug = CMN_KEY, drug_MCARE_DIV_CD_ADJ = MCARE_DIV_CD_ADJ, CMN_KEY = NULL, MCARE_DIV_CD_ADJ=NULL)]
 
 a.dep.drug[, drug_cutoff := Drug_date - 365]        # Drug_date - 365일
 setkey(a.dep.diag, INDI_DSCM_NO, Surgery_date)
 setkey(a.dep.drug, INDI_DSCM_NO, drug_cutoff)
 
 
-a.dep.final <- a.dep.diag[a.dep.drug, on = .(INDI_DSCM_NO, Surgery_date <= drug_cutoff), nomatch = 0L]
+a.dep.final <- a.dep.drug[
+  a.dep.diag,
+  on = .(
+    INDI_DSCM_NO,
+    drug_cutoff >= Surgery_date   # ≡ Surgery_date + 365 <= Drug_date
+  ),
+  nomatch = NA,                   # 기본값; 진단만 있는 행도 유지
+  allow.cartesian = TRUE
+]
 # write_fst(a.dep.final, file.path("data", "a_dep_final.fst"))
 a.dep.final <- read_fst("data/a_dep_final.fst", as.data.table = T)
 
+####################################################################
 
 
 
+a <- copy(a.dep.diag)
+a$Depression <- 0
+a[!is.na(Indexdate), Depression := 1]
+a <- unique(a)
 
 
-
-
-
-.[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
+# .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
 
 #write_fst(a.dep, file.path("data", "a_dep.fst"))
 # a.dep <- read_fst("data/a_dep.fst", as.data.table = T)
 
-attr$`Exclusion1 :우울증 환자만` <- a.dep
 
-a <- copy(a.dep)
-#rm(a.dep)
+
 
 
 
@@ -330,9 +342,11 @@ excl.mental <- read_fst("data/excl_mental.fst", as.data.table = T)
 
 
 # 로직 다시 한 번 확인 필요
-mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO, Indexdate > Mental_date), nomatch = 0L,
+mental.before.dep <- a[excl.mental, on = .(INDI_DSCM_NO), nomatch = 0L,
                        .(INDI_DSCM_NO, Surgery_date, Mental_date, Indexdate, CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery, surg.SICK_SYM1, surg.SICK_SYM2)][Mental_date < Indexdate]
-attr$`이전의 정신질환자 수` <- mental.before.dep
+attr$`이전의 정신질환자 수` = nrow(mental.before.dep)
+
+
 
 #write_fst(mental.before.dep, file.path("data", "mental_before_dep.fst"))
 mental.before.dep <- read_fst("data/mental_before_dep.fst", as.data.table = T)
@@ -351,7 +365,7 @@ mental.before.dep <- read_fst("data/mental_before_dep.fst", as.data.table = T)
 
 
 a <- a[!mental.before.dep, on = "INDI_DSCM_NO"][,  `:=` (INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
-attr$`Exclusion2: 정신질환자 제외 후` <- a
+attr$`Exclusion2: 정신질환자 제외 후` <- nrow(a)
 
 a[, Surgery_date_minus5yr := Surgery_date - 365*5]
 
@@ -359,11 +373,14 @@ a[, Surgery_date_minus5yr := Surgery_date - 365*5]
 
 a %>% head
 
-
+# past.history <- t20_sub[drug.SICK_SYM1 %in% excl.code.disease | drug.SICK_SYM2 %in% excl.code.disease, .(INDI_DSCM_NO, Disease_date=Drug_date)]
 
 # 과거력 5년 제외 (대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외)
 past.history <- t20[SICK_SYM1 %in% excl.code.disease | SICK_SYM2 %in% excl.code.disease | SICK_SYM3 %in% excl.code.disease| SICK_SYM4 %in% excl.code.disease| SICK_SYM5 %in% excl.code.disease,
                     .(INDI_DSCM_NO = as.numeric(INDI_DSCM_NO), Disease_date = as.Date(MDCARE_STRT_DT, "%Y%m%d"))]
+# write_fst(past.history, file.path("data", "past_history.fst"))
+past.history <- read_fst("data/past_history.fst", as.data.table = T)
+past.history[, INDI_DSCM_NO := as.numeric(INDI_DSCM_NO)]
 past.history %>% head 
 
 
@@ -376,11 +393,14 @@ past.history %>% head
 
 
 past.5yr <- past.history[a, on = .(INDI_DSCM_NO, Disease_date < Surgery_date, Disease_date > Surgery_date_minus5yr), nomatch = 0L]
+# write_fst(past.5yr, file.path("data", "past_5yr_history.fst"))
+past.5yr <- read_fst("data/past_history.fst", as.data.table = T)
+past.5yr[, INDI_DSCM_NO:= as.numeric(INDI_DSCM_NO)]
 past.5yr %>% head
 
 
 a <- a[!past.5yr, on = "INDI_DSCM_NO"]
-attr$`Exclusion3: 과거력 5년 제외 후` <- a
+attr$`Exclusion3: 과거력 5년 제외 후` <- nrow(a)
 
 a[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
 
@@ -402,7 +422,7 @@ rm(bnd)
 
 #write_fst(t, file.path("data", "merged.fst"))
 t <- read_fst("data/merged.fst", as.data.table = T)
-t <- t[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
+# t <- t[, `:=` (Surgery_after_1y = Surgery_date + 365, Surgery_after_5y = Surgery_date+ 365*5)]
 t <- t[Age>=18, ]
 attr$`Inclusion 1: Age >=18 :` <-  nrow(t)
 #a <- read_fst("data/merged.fst", as.data.table = T)
