@@ -213,9 +213,14 @@ code.dementia.drug.product <- list(
 # 성분 코드 + 상품 코드를 모두 포함하도록 리스트 확장
 code.dementia.drug <- lapply(
   code.dementia.drug.base,
-  function(codes) unique(c(codes, unlist(code.dementia.drug.product[codes], use.names = FALSE)))
+  function(codes) unique(c(unlist(code.dementia.drug.product[codes], use.names = FALSE)))
 )
 
+
+code.depression.drug.named <- with(
+  stack(code.dep.drug),
+  setNames(ind, values)
+)
 
 # 진통 마취제
 code.opiode.base <- list(
@@ -433,6 +438,16 @@ code.opiode.product <- list(
 )
 
 
+# 성분 코드 + 상품 코드를 모두 포함하도록 리스트 확장
+code.opiode.drug <- lapply(
+  code.opiode.base,
+  function(codes) unique(unlist(code.opiode.product[codes], use.names = FALSE))
+)
+
+code.opiode.drug.named <- with(
+  stack(code.opiode.drug),
+  setNames(ind, values)
+)
 
 
 ## 확인 필요 
@@ -446,9 +461,30 @@ code.cardiovascular <- list(
   )
 
 
-
-
 code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
+
+code.hospitalized <- c("2", "4", "7", "10", "12")
+
+code.chemotherapy <- c("Z08.2", "Z09.2", "Z29.2", "Z51.1", "Z51.2", "Z54.2")
+code.radiotherapy <- c("Y84.2", "Z08.1", "Z09.1", "Z51.0", "Z54.1")
+
+# chemotherapy
+# NO	분류코드	분류항목명
+# 1	Z08.2	Follow-up examination after chemotherapy for malignant neoplasm
+# 2	Z09.2	Follow-up examination after chemotherapy for other conditions
+# 3	Z29.2	Other prophylactic chemotherapy
+# 4	Z51.1	Chemotherapy session for neoplasm
+# 5	Z51.2	Other chemotherapy
+# 6	Z54.2	Convalescence following chemotherapy
+# radiotherapy
+# NO	분류코드	분류항목명
+# 1	Y84.2	Radiological procedure and radiotherapy
+# 2	Z08.1	Follow-up examination after radiotherapy for malignant neoplasm
+# 3	Z09.1	Follow-up examination after radiotherapy for other conditions
+# 4	Z51.0	Radiotherapy session
+# 5	Z54.1	Convalescence following radiotherapy
+
+
 
 # t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", as.data.table = T)
 
@@ -471,10 +507,11 @@ code.surgery.named <- with(stack(code.surgery),
 t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 
 #write_fst(t30.surgery, file.path("data", "t30_surgery.fst"))
-read_fst("data/t30_surgery.fst", as.data.table = T)
+t30.surgery <- read_fst("data/t30_surgery.fst", as.data.table = T)
 
 # a.start <- merge(t30.surgery, t20[, .(CMN_KEY, INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)], by = "CMN_KEY")
-a.start <- merge(t30.surgery, t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM1)], by = "CMN_KEY")
+a.start <- merge(t30.surgery, t20[, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"),
+                                      surg.SICK_SYM1 = SICK_SYM1, surg.SICK_SYM2 = SICK_SYM2, VSHSP_DD_CNT, MDCARE_DD_CNT)], by = "CMN_KEY")
 
 #write_fst(a.start, file.path("data", "a_start.fst"))
 a.start <- read_fst("data/a_start.fst", as.data.table = T)
@@ -500,13 +537,6 @@ attr$`각 수술별 환자 수` <- count_by_code
 
 # a.dep <- t20[SICK_SYM1 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Surgery_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))] %>% 
 #   .[a.start, on = c("INDI_DSCM_NO", "Surgery_date"), roll = -365]
-
-
-code.depression.drug.named <- with(
-  stack(code.dep.drug),
-  setNames(ind, values)
-)
-
 
 
 # t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
@@ -896,18 +926,6 @@ alzheimer <- t20[
 #write_fst(alzheimer, file.path("data", "alzheimer.fst"))
 alzheimer <- read_fst("data/alzheimer.fst", as.data.table = T)
 
-
-
-
-
-
-#월요일에 여기서부터 
-
-
-
-
-
-
 alzheimer[
   a[, .(INDI_DSCM_NO, Indexdate)],
   on = .(INDI_DSCM_NO),
@@ -989,6 +1007,78 @@ AF.cohort <- read_fst("data/AF_cohort.fst", as.data.table = T)
 
 
 
-##
 
+
+
+
+
+
+
+## Readmission & Length of stay 
+setkey(a.start, INDI_DSCM_NO)
+setkey(t20, INDI_DSCM_NO)
+
+a.start[, Surgery_date_after_1m :=  Surgery_date +30]
+
+
+readmit <- a.start[  t20[FORM_CD %in% code.hospitalized, .(CMN_KEY = as.numeric(CMN_KEY), INDI_DSCM_NO, Readmit_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"),
+                                                           readmit.SICK_SYM1 = SICK_SYM1, length_of_stay = VSHSP_DD_CNT, FORM_CD)], 
+                   on = .(INDI_DSCM_NO, Surgery_date < Readmit_date, Surgery_date_after_1m >= Readmit_date, surg.SICK_SYM1 = readmit.SICK_SYM1), nomatch = 0L]
+
+#write_fst(readmit, file.path("data", "readmit.fst"))
+readmit<- read_fst("data/readmit.fst", as.data.table = T)
+
+
+## Opioid consumption 
+t30.opi <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.opiode.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.opiode.drug.named[MCARE_DIV_CD_ADJ])]
+#write_fst(t30.opi, file.path("data", "t30_opi.fst"))
+t30.opi <- read_fst("data/t30_opi.fst", as.data.table = T)
+
+
+t60.opi <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.opiode.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.opiode.drug.named[MCARE_DIV_CD_ADJ])]
+#write_fst(t60.opi, file.path("data", "t60_opi.fst"))
+t60.opi<- read_fst("data/t60_opi.fst", as.data.table = T)
+
+t30_60_opi <- rbind(t30.opi, t60.opi)
+#write_fst(t30_60_opi, file.path("data", "t30_60_opi.fst"))
+t30_60_opi<- read_fst("data/t30_60_opi.fst", as.data.table = T)
+
+a.opioid <- merge(t30_60_opi, 
+                 t20[, .(CMN_KEY, INDI_DSCM_NO, Opioid_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"))],
+                 by = "CMN_KEY")
+
+#write_fst(a.opioid, file.path("data", "a_opioid.fst"))
+a.opioid<- read_fst("data/a_opioid.fst", as.data.table = T)
+
+
+
+
+############################################################
+# Final dataset
+############################################################
+
+a <- read_fst("data/merged_surg_indexdate.fst", as.data.table = T)
+dementia.cohort.final<- read_fst("data/dimentia_cohort_final.fst", as.data.table = T)
+a.opioid<- read_fst("data/a_opioid.fst", as.data.table = T)
+readmit<- read_fst("data/readmit.fst", as.data.table = T)
+AF.cohort <- read_fst("data/AF_cohort.fst", as.data.table = T)
+cardiovascular.cohort <- read_fst("data/cardiovascular_cohort.fst", as.data.table = T)
+
+a$dementia <- 0
+a[INDI_DSCM_NO %in% dementia.cohort.final$INDI_DSCM_NO, dementia:=1]
+
+
+a$cardiovascular <- 0
+a[INDI_DSCM_NO %in% cardiovascular.cohort$INDI_DSCM_NO, cardiovascular:=1]
+
+a$new_AF <- 0
+a[INDI_DSCM_NO %in% AF.cohort$INDI_DSCM_NO, new_AF:=1]
+
+a$readmission <- 0
+a[INDI_DSCM_NO %in% readmit$INDI_DSCM_NO, readmission:=1]
+
+a$opioid <- 0
+a[INDI_DSCM_NO %in% a.opioid$INDI_DSCM_NO, opioid:=1]
+
+a$yr1_death <- NA
 
