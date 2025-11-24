@@ -11,7 +11,7 @@ setDTthreads(0)  ## 0: All
 #     #fwrite(file.path("data", paste0("nsc2_", v, "_1000.csv")))
 # }
 
-# t20 <- read.csv("data/NSC2_M20_1619.CSV") %>%  as.data.table()
+
 # ## fst
 # # inst <- read_fst("data/nsc2_inst_1000.fst", as.data.table = T)
 # # bnc <- read_fst("data/nsc2_bnc_1000.fst", as.data.table = T)
@@ -35,6 +35,21 @@ setDTthreads(0)  ## 0: All
 # 
 # g1e_2017 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2017.csv") %>% as.data.table()
 
+t20 <- t20[substr(t20$MDCARE_STRT_DT,1,4) <= "2013"]
+#write_fst(t20, file.path("data", "t20.fst"))
+t20 <- read_fst("data/t20.fst", as.data.table = T)
+
+# cmn_key <- t20[,CMN_KEY]
+# 
+# # write_fst(t20[,.(INDI_DSCM_NO, CMN_KEY)], file.path("data", "CMN_KEY.fst"))
+# t20[CMN_KEY]
+# 
+# t30 <- unique(t30)
+# # t30 <- t30[as.numeric(CMN_KEY) %in% as.numeric(cmn_key),]
+# write_fst(t30, file.path("data", "t30.fst"))
+# 
+# t60 <- t60[CMN_KEY %in% CMN_KEY,]
+# write_fst(t60, file.path("data", "t60.fst"))
 
 
 # depression
@@ -125,7 +140,7 @@ code.surgery = list(
     "O1781","O1782","O1783",
     "O1791","O1792","O1793","O1794","O1795","O1796","O1797","O1798",
     "O1800","O1810","O1821","O1822","O1823","O1824","O1825","O1826",
-    "O1840","O1841","O1861","O1873","O1874","O1875","O1878","O1879",
+    "O1840","O1841", "O1850","O1861","O1873","O1874","O1875","O1878","O1879",
     "O1960",
     "OA640","OA641","OA642","OA647","OA648","OA649"
   ),
@@ -235,7 +250,6 @@ code.cardiovascular <- list(
 
 code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
 
-t20$SICK_SYM1[grepl("I48", t20$SICK_SYM1) ]
 # t20 <- read_fst("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study/data/m20.fst", as.data.table = T)
 
 ## Previous disease: Among all sick code
@@ -295,12 +309,16 @@ code.depression.drug.named <- with(
 
 
 
-t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
-t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+# t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+# t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), Drug_date = MDCARE_STRT_DT, MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+t30.dep <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+t60.dep <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.dep.drug), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_drug = code.depression.drug.named[MCARE_DIV_CD_ADJ])]
+
 
 t.combined.dep <- rbind(t30.dep, t60.dep)
 t.combined.dep
 #write_fst(t.combined.dep, file.path("data", "t_combined_dep.fst"))
+
 t.combined.dep <- read_fst("data/t_combined_dep.fst", as.data.table = T)
 t.combined.dep[, CMN_KEY := as.numeric(CMN_KEY)]
 setkey(t.combined.dep, CMN_KEY)
@@ -326,36 +344,36 @@ a.dep.diag <- read_fst("data/a_dep_diag.fst", as.data.table = T)
 ####################################################################
 
 
-#a.dep.drug <- t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)]
-setkey(t.combined.dep, CMN_KEY)
-
-t20_sub <- t20[, .(INDI_DSCM_NO, CMN_KEY = as.numeric(CMN_KEY), Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), drug.SICK_SYM1 = SICK_SYM1, drug.SICK_SYM2 = SICK_SYM1)]
-rm(t20)
-setkey(t20_sub, CMN_KEY)
-
-
-
-a.dep.drug <- merge(t.combined.dep, t20_sub, by = "CMN_KEY")
-# write_fst(a.dep.drug, file.path("data", "a_dep_drug.fst"))
-a.dep.drug <- read_fst("data/a_dep_drug.fst", as.data.table = T)
-a.dep.drug[, `:=` (CMN_KEY_drug = CMN_KEY, drug_MCARE_DIV_CD_ADJ = MCARE_DIV_CD_ADJ, CMN_KEY = NULL, MCARE_DIV_CD_ADJ=NULL)]
-
-a.dep.drug[, drug_cutoff := Drug_date - 365]        # Drug_date - 365일
-setkey(a.dep.diag, INDI_DSCM_NO, Surgery_date)
-setkey(a.dep.drug, INDI_DSCM_NO, drug_cutoff)
-
-
-a.dep.final <- a.dep.drug[
-  a.dep.diag,
-  on = .(
-    INDI_DSCM_NO,
-    drug_cutoff >= Surgery_date   # ≡ Surgery_date + 365 <= Drug_date
-  ),
-  nomatch = NA,                   # 기본값; 진단만 있는 행도 유지
-  allow.cartesian = TRUE
-]
-# write_fst(a.dep.final, file.path("data", "a_dep_final.fst"))
-a.dep.final <- read_fst("data/a_dep_final.fst", as.data.table = T)
+# #a.dep.drug <- t20[SICK_SYM1 %like% code.DEP | SICK_SYM2 %like% code.DEP, .(INDI_DSCM_NO, CMN_KEY, Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), Indexdate = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), SICK_SYM1, SICK_SYM2)]
+# setkey(t.combined.dep, CMN_KEY)
+# 
+# t20_sub <- t20[, .(INDI_DSCM_NO, CMN_KEY = as.numeric(CMN_KEY), Drug_date = as.Date(MDCARE_STRT_DT, format = "%Y%m%d"), drug.SICK_SYM1 = SICK_SYM1, drug.SICK_SYM2 = SICK_SYM1)]
+# rm(t20)
+# setkey(t20_sub, CMN_KEY)
+# 
+# 
+# 
+# a.dep.drug <- merge(t.combined.dep, t20_sub, by = "CMN_KEY")
+# # write_fst(a.dep.drug, file.path("data", "a_dep_drug.fst"))
+# a.dep.drug <- read_fst("data/a_dep_drug.fst", as.data.table = T)
+# a.dep.drug[, `:=` (CMN_KEY_drug = CMN_KEY, drug_MCARE_DIV_CD_ADJ = MCARE_DIV_CD_ADJ, CMN_KEY = NULL, MCARE_DIV_CD_ADJ=NULL)]
+# 
+# a.dep.drug[, drug_cutoff := Drug_date - 365]        # Drug_date - 365일
+# setkey(a.dep.diag, INDI_DSCM_NO, Surgery_date)
+# setkey(a.dep.drug, INDI_DSCM_NO, drug_cutoff)
+# 
+# 
+# a.dep.final <- a.dep.drug[
+#   a.dep.diag,
+#   on = .(
+#     INDI_DSCM_NO,
+#     drug_cutoff >= Surgery_date   # ≡ Surgery_date + 365 <= Drug_date
+#   ),
+#   nomatch = NA,                   # 기본값; 진단만 있는 행도 유지
+#   allow.cartesian = TRUE
+# ]
+# # write_fst(a.dep.final, file.path("data", "a_dep_final.fst"))
+# a.dep.final <- read_fst("data/a_dep_final.fst", as.data.table = T)
 
 ####################################################################
 
@@ -368,7 +386,6 @@ a <- unique(a)
 
 
 # .[!is.na(Indexdate)] # a.start에서 우울증 있는 사람들만 추출
-
 #write_fst(a.dep, file.path("data", "a_dep.fst"))
 # a.dep <- read_fst("data/a_dep.fst", as.data.table = T)
 
@@ -530,6 +547,10 @@ dimentia <- t20[
   )
 ]
 
+# write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
+dimentia <- read_fst("data/t20_dimentia.fst", as.data.table = T)
+
+
 code.dimentia.drug.named <- with(
   stack(code.dementia.drug),
   setNames(ind, values)
@@ -549,7 +570,6 @@ t30.dimentia<- read_fst("data/t60_dimentia.fst", as.data.table = T)
 t.combined.dimentia <- rbind(t30.dimentia, t60.dimentia)
 t.combined.dimentia
 #write_fst(t.combined.dimentia, file.path("data", "t30_60_dimentia.fst"))
-t.combined.dimentia<- read_fst("data/t30_60_dimentia.fst", as.data.table = T)
 
 
 #write_fst(dimentia, file.path("data", "t20_dimentia.fst"))
@@ -596,7 +616,6 @@ dementia.med <- t.combined.dimentia[
 dementia.med<- read_fst("data/dimentia_final.fst", as.data.table = T)
 
 
-
 dementia.med.unique <- unique(dementia.med, by = c("INDI_DSCM_NO", "CMN_KEY", "Drug_Date"))
 dementia.med.unique[, N := .N, by = INDI_DSCM_NO][N >= 2]
 
@@ -604,27 +623,52 @@ dementia.med.count <- dementia.med.unique[, .N, by = INDI_DSCM_NO][N >= 2]
 
 
 ####
+
+# tt1 <- dimentia[
+#   a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
+#   on = .(INDI_DSCM_NO),
+#   nomatch = 0L
+# ]  %>% unique()
+# 
+# tt2 <- tt1[]
+# 
+# 
+# tt2 <- dimentia[
+#   a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
+#   on = .(INDI_DSCM_NO),
+#   nomatch = 0L
+# ][Dimentia_Date < Surgery_date] %>% unique()
+
+
+
 dimentia.before.surg <- dimentia[
   a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L
 ][Dimentia_Date < Surgery_date] %>% unique()
 
-dimentia[
-  a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
-  on = .(INDI_DSCM_NO),
-  nomatch = 0L
-][Dimentia_Date >= Surgery_date][INDI_DSCM_NO %in% dimentia.before.surg$INDI_DSCM_NO] %>% unique
+
+###
+# Q. 수술전에 우울증이 있던 환자를 모두 제외하고, 수술후 1~5년 안에 새롭게 우울증이 발병한 환자만 선택할 것인지 
+# 아니고 우울증이 있더라도 우울증 코드가 1~5년 안에 있다면 선택할 것인지 확인이 필요. 
+# 일단 우울증이 이전에 있었던 사람들을 다 빼고 진행해보자 
 
 ####
-
-
 
 dementia.dx <- dimentia[
   a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L
-][Dimentia_Date >= Surgery_after_1y] # & Dimentia_Date <= Surgery_after_5y
+][Dimentia_Date >= Surgery_date][!INDI_DSCM_NO %in% dimentia.before.surg$INDI_DSCM_NO] %>% unique
+
+# 
+# dementia.dx <- dimentia[
+#   a[, .(INDI_DSCM_NO, Surgery_date, Surgery_after_1y, Surgery_after_5y)],
+#   on = .(INDI_DSCM_NO),
+#   nomatch = 0L
+# ][Dimentia_Date >= Surgery_after_1y] # & Dimentia_Date <= Surgery_after_5y
+####
+
 
 # a$Dimentia = 0
 # a <- dimentia[a, on = .(INDI_DSCM_NO), nomatch = 0L ][Dimentia_Date >= Surgery_after_1y & Dimentia_Date <= Surgery_after_5y, Dimentia := 1]
@@ -635,7 +679,7 @@ dementia.cohort <- dementia.dx[dementia.med.count, on = "INDI_DSCM_NO", nomatch 
 #write_fst(dementia.cohort, file.path("data", "dimentia_cohort.fst"))
 dementia.cohort<- read_fst("data/dimentia_cohort.fst", as.data.table = T)
 
-## 여기서부터 다시 본다. 
+
 
 
 # Exclude Alzheimer disease diagnoses occurring before or within 1 year after depression diagnosis.
@@ -652,11 +696,30 @@ alzheimer <- t20[
 #write_fst(alzheimer, file.path("data", "alzheimer.fst"))
 alzheimer <- read_fst("data/alzheimer.fst", as.data.table = T)
 
+
+
+
+
+
+#월요일에 여기서부터 
+
+
+
+
+
+
+alzheimer[
+  a[, .(INDI_DSCM_NO, Indexdate)],
+  on = .(INDI_DSCM_NO),
+  nomatch = 0L
+] 
+
+
 alzheimer_before_dep <- alzheimer[
   a[, .(INDI_DSCM_NO, Indexdate)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L
-][AD_Date < Indexdate, .(INDI_DSCM_NO)]
+][AD_Date < Indexdate, .(INDI_DSCM_NO)] %>% unique
 
 alzheimer_within_1y <- alzheimer[
   a[, .(INDI_DSCM_NO, Indexdate)],
@@ -693,7 +756,7 @@ cardiovascular.cohort <- cardiovascular[
   a[, .(INDI_DSCM_NO, Indexdate)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L
-][Cardio_Date >= Indexdate + 365 & Cardio_Date <= Indexdate + 365*5, ]
+][Cardio_Date >= Indexdate + 365 & Cardio_Date <= Indexdate + 365*6, ]
 
 
 #write_fst(cardiovascular.cohort, file.path("data", "cardiovascular_cohort.fst"))
@@ -709,22 +772,21 @@ AF <- t20[
     CMN_KEY,
     AF_Date = as.Date(MDCARE_STRT_DT, "%Y%m%d")
   )
-][!is.na(Cardio_Date)]
+][!is.na(AF_Date)]
 
-#write_fst(cardiovascular, file.path("data", "cardiovascular.fst"))
+#write_fst(cardiovascular, file.path("data", "AF.fst"))
 AF <- read_fst("data/AF.fst", as.data.table = T)
 
-cardiovascular.cohort <- AF[
+AF.cohort <- AF[
   a[, .(INDI_DSCM_NO, Indexdate)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L
 ][AF_Date >= Indexdate + 365 & AF_Date <= Indexdate + 365*5, ]
 
 
-#write_fst(cardiovascular.cohort, file.path("data", "cardiovascular_cohort.fst"))
-AF.cohort <- read_fst("data/cardiovascular_cohort.fst", as.data.table = T)
+#write_fst(AF.cohort, file.path("data", "AF_cohort.fst"))
+AF.cohort <- read_fst("data/AF_cohort.fst", as.data.table = T)
 
-code.AF
 
 
 ##
