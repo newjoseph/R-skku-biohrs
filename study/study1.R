@@ -453,15 +453,13 @@ code.opiode.drug.named <- with(
 ## 확인 필요 
 # Cardiovascular outcome 
 code.cardiovascular <- list(
-  acute.myocardial.infarction = c("I21", "I21.0", "I21.1", "I21.2", "I21.3", "I21.4", "I21.9", #급성 심근경색
-                                  
-                                  "I23", "I23.0", "I23.1", "I23.2", "I23.3", "I23.4", "I23.5", "I23.6", "I23.8"), #여기는 확인 
-  angina.pectoris = c( "I20", "I20.1", "I20.8", "I20.9"), #협심증
-  CHF = c( "I11.0", "I11.9", "I13.0", "I13.2", "I50.0") #심부전
+  acute.myocardial.infarction = c("I21", "I22", "I23", "I24"),
+  angina.pectoris = c("I20"),
+  congestive.heart.failure = c("I09.9", "I11.0", "I13.2", "I25.5", "I42", "I42.0", "I42.5", "I42.6", "I42.7", "I42.8", "I42.9", "I43", "I43.0", "I43.1", "I43.2", "I43.8", "I43.9", "I50", "I50.0", "I50.1", "I50.9", "P29.0")
   )
 
 
-code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
+code.AF <- c("I48", "I48.0", "I48.1", "I48.2", "I48.3", "I48.4", "I48.9")
 
 code.hospitalized <- c("2", "4", "7", "10", "12")
 
