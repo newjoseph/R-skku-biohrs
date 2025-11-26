@@ -103,10 +103,14 @@ code.dep.drug <- list(
 
 # exclude diseases
 excl.code.disease <- list(
-  dementia = c("G20"),
+  dementia =c("F00", "F01", "F02", "F03", "F051", "G30", "G311"),
   Parkinson = c("G20"),
-  stroke  = c("I60", "I61", "I62", "I63", "I64"),
-  cerebral.hemorrhage = c("S06"),
+  stroke  = c("I60", "I60.0", "I60.1", "I60.2", "I60.3", "I60.4", "I60.5", "I60.6", "I60.7", "I60.8", "I60.9",
+            "I61", "I61.0", "I61.1", "I61.2", "I61.3", "I61.4", "I61.5", "I61.6", "I61.8", "I61.9",
+            "I62", "I62.0", "I62.1", "I62.9",
+            "I63", "I63.0", "I63.1", "I63.2", "I63.3", "I63.4", "I63.5", "I63.6", "I63.8", "I63.9",
+            "I64"),
+  cerebral.hemorrhage = c("S06", "S06.0", "S06.1", "S06.2", "S06.3", "S06.4", "S06.5", "S06.6", "S06.7", "S06.8", "S06.9"),
   mental.disease <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
 )
 
@@ -129,32 +133,35 @@ code.ingredient <- list(
 # operation list
 code.surgery = list(
   heart = c(
-    "M6551","M6552","M6553","M6554",
-    "M6561","M6562","M6563","M6564","M6565","M6566","M6567",
-    "M6571","M6572","M6580","M6581","M6582",
-    "O1640","O1641","O1642","O1647","O1648","O1649",
-    "O1671","O1672","O1680",
-    "O1701","O1702","O1703","O1704","O1705",
-    "O1710","O1711","O1721","O1723",
-    "O1740","O1750","O1760","O1770",
-    "O1781","O1782","O1783",
-    "O1791","O1792","O1793","O1794","O1795","O1796","O1797","O1798",
-    "O1800","O1810","O1821","O1822","O1823","O1824","O1825","O1826",
-    "O1840","O1841", "O1850","O1861","O1873","O1874","O1875","O1878","O1879",
-    "O1960",
-    "OA640","OA641","OA642","OA647","OA648","OA649"
+    "O1640", "O1641", "O1647", "O1648", "O1649", # CABG On-pump
+    "OA640", "OA641", "OA647", "OA648", "OA649", # CABG Off-pump
+    "O2031", "O2032", "O2033", # Thoracic aorta surgery
+    "O1671", "O1672", # PDA
+    "O1701", "O1702", # Cardiovascular septum closure
+    "O1703", "O1704", # Pulmonary artery ligation
+    "O1705", "O1710", # ASD closure
+    "O1711", # Minimal invasive ASD closure
+    "O1721", # VSD closure
+    "O1723", # Minimal invasive VSD closure
+    "O1800", # Tetraology of Fallot
+    "O1730", "O1782", "O1792", "O1795", # Mitral valve
+    "O1740", "O1783", "O1793", "O1796", "O1799", # Aortic valve
+    "O1750", "O1770", "O1810", "O1797", "O1798", # Pulmonary valve
+    "O1760", "O1781", "O1791", "O1794" # Tricuspid valve
   ),
-  stomach = c(
+  stomach = c( 
     "Q0251","Q0252","Q0253","Q0254","Q0255","Q0256","Q0257","Q0258",
-    "Q2533","Q2534","Q2536","Q2537","Q2594","Q2598"
+    "Q2533","Q2534","Q2536","Q2537","Q2594","Q2598" #upper GI
   ),
   colon = c(
     "Q1261","Q1262",
     "Q2671","Q2672","Q2673","Q2679",
     "Q2921","Q2922","Q2923","Q2924","Q2925","Q2926","Q2927",
     "QA671","QA672","QA673","QA679",
-    "QA921","QA922","QA923","QA924","QA925","QA926"
+    "QA921","QA922","QA923","QA924","QA925","QA926" #lower GI
   ),
+  
+  ## Robotic prostatectomy 추가 필요 
   prostate = c("R3950","R3960","RZ512")
 )
 
@@ -500,9 +507,38 @@ code.radiotherapy <- c("Y84.2", "Z08.1", "Z09.1", "Z51.0", "Z54.1")
 code.surgery.named <- with(stack(code.surgery),
                             setNames(ind, values))
 
+# --- Robotic Prostatectomy Logic Start ---
+# Robotic prostatectomy definition: QZ961 + L1211 (General Anesthesia) + Pathology Code + NO Standard Prostatectomy Codes
+code.robot <- "QZ961"
+code.anesthesia <- "L1211"
+code.pathology <- c("C5500", "C5501", "C5502", "C5503", "C5504", "C5505", "C5506", "C5507", "C5508", "C5509", 
+                    "C5911", "C5912", "C5913", "C5914", "C5915", "C5916", "C5917", "C5918", "C5919")
+code.prostate.std <- code.surgery$prostate
+
+# Filter for relevant codes first for performance
+t30.subset <- t30[MCARE_DIV_CD_ADJ %in% c(code.robot, code.anesthesia, code.pathology, code.prostate.std)]
+
+# Check conditions by CMN_KEY
+robotic.candidates <- t30.subset[, .(
+  has_robot = any(MCARE_DIV_CD_ADJ == code.robot),
+  has_anesthesia = any(MCARE_DIV_CD_ADJ == code.anesthesia),
+  has_pathology = any(MCARE_DIV_CD_ADJ %in% code.pathology),
+  has_std_prostate = any(MCARE_DIV_CD_ADJ %in% code.prostate.std)
+), by = CMN_KEY]
+
+# Condition: Robot AND Anesthesia AND Pathology AND NOT Standard Prostatectomy
+robotic.keys <- robotic.candidates[has_robot & has_anesthesia & has_pathology & !has_std_prostate, CMN_KEY]
+
+# Extract robotic surgery cases
+t30.robotic <- t30[CMN_KEY %in% robotic.keys & MCARE_DIV_CD_ADJ == code.robot, 
+                   .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = "prostate")]
+# --- Robotic Prostatectomy Logic End ---
 
 # t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
-t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
+t30.surgery.std <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
+
+# Merge standard surgery and robotic surgery
+t30.surgery <- rbind(t30.surgery.std, t30.robotic)
 
 #write_fst(t30.surgery, file.path("data", "t30_surgery.fst"))
 t30.surgery <- read_fst("data/t30_surgery.fst", as.data.table = T)
@@ -645,26 +681,18 @@ attr$`이전의 정신질환자 수` = nrow(mental.before.dep)
 
 #write_fst(mental.before.dep, file.path("data", "mental_before_dep.fst"))
 mental.before.dep <- read_fst("data/mental_before_dep.fst", as.data.table = T)
-
 #rm(excl.mental)
 
-# mental.before.dep2 <- excl.mental[a, on = .(INDI_DSCM_NO, Mental_date == Indexdate), nomatch = 0L, .(INDI_DSCM_NO, Mental_date, Indexdate, Surgery_date, CMN_KEY)]
-# mental.before.dep[Mental_date != Indexdate] %>% dim
-# check code
-# a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT < Indexdate] %>% dim
-# a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease)][MDCARE_STRT_DT >= Indexdate] %>% dim
-# a[(SICK_SYM1 %like% code.mental.disease | SICK_SYM2 %like% code.mental.disease), .(SICK_SYM1, SICK_SYM2, MDCARE_STRT_DT, Indexdate)]
 
 
 # 정신 질환자 exclusion applied
-
 
 a <- a[!mental.before.dep, on = "INDI_DSCM_NO"][,  `:=` (INDI_DSCM_NO = as.integer(INDI_DSCM_NO))]
 attr$`Exclusion2: 정신질환자 제외 후` <- nrow(a)
 
 a[, Surgery_date_minus5yr := Surgery_date - 365*5]
-
 #rm(mental.before.dep)
+
 
 a %>% head
 
