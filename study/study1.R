@@ -517,6 +517,8 @@ code.prostate.std <- code.surgery$prostate
 
 # Filter for relevant codes first for performance
 t30.subset <- t30[MCARE_DIV_CD_ADJ %in% c(code.robot, code.anesthesia, code.pathology, code.prostate.std)]
+#write_fst(t30.subset, file.path("data", "t30_subset.fst"))
+
 
 # Check conditions by CMN_KEY
 robotic.candidates <- t30.subset[, .(
@@ -526,16 +528,22 @@ robotic.candidates <- t30.subset[, .(
   has_std_prostate = any(MCARE_DIV_CD_ADJ %in% code.prostate.std)
 ), by = CMN_KEY]
 
+write_fst(robotic.candidates, file.path("data", "robotic.candidates.fst"))
+
 # Condition: Robot AND Anesthesia AND Pathology AND NOT Standard Prostatectomy
 robotic.keys <- robotic.candidates[has_robot & has_anesthesia & has_pathology & !has_std_prostate, CMN_KEY]
 
 # Extract robotic surgery cases
 t30.robotic <- t30[CMN_KEY %in% robotic.keys & MCARE_DIV_CD_ADJ == code.robot, 
                    .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = "prostate")]
+write_fst(t30.robotic, file.path("data", "t30_robotic.fst"))
+
 # --- Robotic Prostatectomy Logic End ---
 
 # t30.surgery <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY = as.character(CMN_KEY), MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
 t30.surgery.std <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), .(CMN_KEY, MCARE_DIV_CD_ADJ, Type_surgery = code.surgery.named[MCARE_DIV_CD_ADJ])]
+write_fst(t30.surgery.std, file.path("data", "t30_surgery_std.fst"))
+
 
 # Merge standard surgery and robotic surgery
 t30.surgery <- rbind(t30.surgery.std, t30.robotic)
@@ -866,7 +874,7 @@ dementia.med <- t.combined.dimentia[
   a[, .(INDI_DSCM_NO, Surgery_after_1y, Surgery_after_5y)],
   on = .(INDI_DSCM_NO),
   nomatch = 0L] %>% # 기존에 대수술 받은 사람들이랑 합치기 
-  .[Drug_Date >= Surgery_after_1y ] # 수술후에 1년 이후로 필터링. (& Drug_Date <= Surgery_after_5y  5년 사이 필터링 
+  .[Drug_Date >= Surgery_after_1y & Drug_Date <= Surgery_after_5y] # 수술후에 1년 이후로 필터링. (& Drug_Date <= Surgery_after_5y  5년 사이 필터링 
 
 #write_fst(dementia.med, file.path("data", "dimentia_final.fst"))
 dementia.med<- read_fst("data/dimentia_final.fst", as.data.table = T)
@@ -905,9 +913,7 @@ dimentia.before.surg <- dimentia[
 
 
 ###
-# Q. 수술전에 우울증이 있던 환자를 모두 제외하고, 수술후 1~5년 안에 새롭게 우울증이 발병한 환자만 선택할 것인지 
-# 아니고 우울증이 있더라도 우울증 코드가 1~5년 안에 있다면 선택할 것인지 확인이 필요. 
-# 일단 우울증이 이전에 있었던 사람들을 다 빼고 진행해보자 
+# Q. 수술전에 우울증이 있던 환자를 모두 제외하고, 수술후 1~5년 안에 새롭게 우울증이 발병한 환자만 선택
 
 ####
 
@@ -939,7 +945,7 @@ dementia.cohort<- read_fst("data/dimentia_cohort.fst", as.data.table = T)
 
 
 # Exclude Alzheimer disease diagnoses occurring before or within 1 year after depression diagnosis.
-code.alzheimer <- paste0(c("F00", "G30"), collapse = "|") # 코드 확인 필요 
+code.alzheimer <- paste0(c("F00", "G30"), collapse = "|")
 alzheimer <- t20[
   SICK_SYM1 %like% code.alzheimer | SICK_SYM2 %like% code.alzheimer,
   .(
@@ -996,11 +1002,26 @@ cardiovascular <- t20[
 #write_fst(cardiovascular, file.path("data", "cardiovascular.fst"))
 cardiovascular <- read_fst("data/cardiovascular.fst", as.data.table = T)
 
+# Exclude patients diagnosed before surgery or within 1 year after surgery
+exclude_patients_cardio <- cardiovascular[
+  a[, .(INDI_DSCM_NO, Indexdate)], 
+  on = "INDI_DSCM_NO", 
+  nomatch = 0L 
+][
+  Cardio_Date <= Indexdate + 365, 
+  .(INDI_DSCM_NO)
+] %>% unique()
+
+# Define cohort: Diagnoses between 1 year and 6 years post-surgery (5-year observation)
 cardiovascular.cohort <- cardiovascular[
+  !exclude_patients_cardio, on = "INDI_DSCM_NO"
+][
   a[, .(INDI_DSCM_NO, Indexdate)],
-  on = .(INDI_DSCM_NO),
+  on = "INDI_DSCM_NO",
   nomatch = 0L
-][Cardio_Date >= Indexdate + 365 & Cardio_Date <= Indexdate + 365*6, ]
+][
+  Cardio_Date > Indexdate + 365 & Cardio_Date <= Indexdate + (365 * 6)
+] %>% unique(by = "INDI_DSCM_NO")
 
 
 #write_fst(cardiovascular.cohort, file.path("data", "cardiovascular_cohort.fst"))
