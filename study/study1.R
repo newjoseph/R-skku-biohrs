@@ -53,19 +53,19 @@ t20 <- read_fst("data/t20.fst", as.data.table = T)
 
 
 # depression
-code.DEP <- paste(paste0("F", 32:34), collapse = "|")
+code.DEP <- paste(c("F32.0", "F32.1", "F32.2", "F32.3", "F32.8", "F32.9", "F33.0", "F33.1", "F33.2", "F33.3", "F33.8", "F33.9"), collapse = "|")
 
 ## Supp 2 확인필요 교수님 정의 필요. 아래 항목은 무관
-code.dep.list <- list(
-  depression = paste0("F", 32:34)
-  # Attention = paste0(c("F90.0", "Z43", "Z48.0"), collapse = "|"),
-  # Memory = c("G20"),
-  # Visuoconstruction  = c("I60", "I61", "I62", "I63", "I64"),
-  # VerbalFfluency = c("S06"),
-  # Processing_Speed <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|"),
-  # Executive_Function = c("G20"),
-  # Fine_Motor_Speed  = c("I60", "I61", "I62", "I63", "I64")
-)
+# code.dep.list <- list(
+#   depression = paste0("F", 32:34)
+#   # Attention = paste0(c("F90.0", "Z43", "Z48.0"), collapse = "|"),
+#   # Memory = c("G20"),
+#   # Visuoconstruction  = c("I60", "I61", "I62", "I63", "I64"),
+#   # VerbalFfluency = c("S06"),
+#   # Processing_Speed <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|"),
+#   # Executive_Function = c("G20"),
+#   # Fine_Motor_Speed  = c("I60", "I61", "I62", "I63", "I64")
+# )
 
 # 교수님 확인후 추가 필요 
 code.dep.drug <- list(
@@ -167,10 +167,10 @@ code.dementia <- paste0(c("F00", "F01", "F02", "F03", "F051", "G30", "G311"), co
 
 # 치매 약물
 code.dementia.drug.base <- list(
-  rivastigmine = c("224501ACH", "224503ACH", "224504ACH", "224505ACH", "224506CPC", "224507CPC", "224508CPC"),
-  galantamine = c("385203ACR", "385203ATR", "385204ACR", "385204ATR", "385205ACR", "385205ATR"),
-  memantine  = c("190001ATB", "190003ATD", "190004ATB", "190004ATD", "190005ATB", "190006ATD", "190031ALQ", "738600ATB"),
-  donepezil = c("738600ATB", "148601APD", "148601ATB", "148601ATD", "148602APD", "148602ATB", "148602ATD", "148603ATB", "148604ATB", "148630ALQ", "148631ALQ", "643403CPC", "643404CPC", "738600ATB")
+  rivastigmine = c("224501ACH", "224502ALQ", "224503ACH", "224504ACH", "224505ACH", "224506CPC", "224507CPC", "224508CPC"),
+  galantamine = c("385201ATB", "385202ATB", "385203ACR", "385203ATR", "385204ACR", "385204ATR", "385205ACR", "385205ATR"),
+  memantine  = c("190001ALQ", "190001ATB", "190001BIJ", "190002ASY", "190003ATD", "190004ATB", "190004ATD", "190005ATB", "190006ATD", "190030ASY", "190031ALQ", "190032ALQ"),
+  donepezil = c("148601APD", "148601ATB", "148601ATD", "148602APD", "148602ATB", "148602ATD", "148603ATB", "148604ATB", "148630ALQ", "148631ALQ")
 )
 
 # 성분 코드별 상품(약제) 코드 리스트
@@ -1063,6 +1063,9 @@ a.opioid<- read_fst("data/a_opioid.fst", as.data.table = T)
 readmit<- read_fst("data/readmit.fst", as.data.table = T)
 AF.cohort <- read_fst("data/AF_cohort.fst", as.data.table = T)
 cardiovascular.cohort <- read_fst("data/cardiovascular_cohort.fst", as.data.table = T)
+
+a$death = 0
+a[!is.na(DTH_ASSMD_DT), death:=1]
 
 a$dementia <- 0
 a[INDI_DSCM_NO %in% dementia.cohort.final$INDI_DSCM_NO, dementia:=1]
