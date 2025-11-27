@@ -1039,24 +1039,37 @@ AF <- t20[
   )
 ][!is.na(AF_Date)]
 
-#write_fst(cardiovascular, file.path("data", "AF.fst"))
+#write_fst(AF, file.path("data", "AF.fst"))
 AF <- read_fst("data/AF.fst", as.data.table = T)
 
+
+exclude_patients_AF <- AF[
+  a[, .(INDI_DSCM_NO, Indexdate)], 
+  on = "INDI_DSCM_NO", 
+  nomatch = 0L 
+][
+  AF_Date <= Indexdate + 365, 
+  .(INDI_DSCM_NO)
+] %>% unique()
+
+#write_fst(exclude_patients_AF, file.path("data", "exclude_patients_AF.fst"))
+exclude_patients_AF<- read_fst("data/exclude_patients_AF.fst", as.data.table = T)
+
+
+# Define cohort: Diagnoses between 1 year and 6 years post-surgery (5-year observation)
 AF.cohort <- AF[
+  !exclude_patients_AF, on = "INDI_DSCM_NO"
+][
   a[, .(INDI_DSCM_NO, Indexdate)],
-  on = .(INDI_DSCM_NO),
+  on = "INDI_DSCM_NO",
   nomatch = 0L
-][AF_Date >= Indexdate + 365 & AF_Date <= Indexdate + 365*6, ]
+][
+  AF_Date > Indexdate + 365 & AF_Date <= Indexdate + (365 * 6)
+] %>% unique(by = "INDI_DSCM_NO")
 
 
 #write_fst(AF.cohort, file.path("data", "AF_cohort.fst"))
 AF.cohort <- read_fst("data/AF_cohort.fst", as.data.table = T)
-
-
-
-
-
-
 
 
 
