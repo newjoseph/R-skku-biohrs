@@ -4,6 +4,9 @@ format: html
 editor: visual
 ---
 
+# Set scipen to a high value to prevent scientific notation
+options(scipen = 999)
+
 
 ```{r}
 library(data.table);library(magrittr);library(fst);library(openxlsx);library(parallel);library(haven);
@@ -57,6 +60,15 @@ code.surgery = list(
   prostate = c("R3950","R3960","RZ512")
 )
 
+# --- Robotic Prostatectomy Logic Start ---
+# Robotic prostatectomy definition: QZ961 + L1211 (General Anesthesia) + Pathology Code + NO Standard Prostatectomy Codes
+code.robot <- "QZ961"
+code.anesthesia <- "L1211" # 전신마취 
+code.pathology <- c("C5500", "C5501", "C5502", "C5503", "C5504", "C5505", "C5506", "C5507", "C5508", "C5509", 
+                    "C5911", "C5912", "C5913", "C5914", "C5915", "C5916", "C5917", "C5918", "C5919")
+code.prostate.std <- code.surgery$prostate
+
+
 code.heart <- code.surgery$heart
 code.other.major <- c(code.surgery$stomach, code.surgery$colon, code.surgery$prostate)
 
@@ -99,8 +111,8 @@ code.dep.drug <- list(
 )
 
 # exclude diseases
-excl.code.disease <- list(
-  dementia =c("F00", "F01", "F02", "F03", "F051", "G30", "G311"),
+code.excl.disease <- list(
+  dementia = c("F00", "F01", "F02", "F03", "F051", "G30", "G311"),
   Parkinson = c("G20"),
   stroke  = c("I60", "I60.0", "I60.1", "I60.2", "I60.3", "I60.4", "I60.5", "I60.6", "I60.7", "I60.8", "I60.9",
             "I61", "I61.0", "I61.1", "I61.2", "I61.3", "I61.4", "I61.5", "I61.6", "I61.8", "I61.9",
@@ -108,7 +120,7 @@ excl.code.disease <- list(
             "I63", "I63.0", "I63.1", "I63.2", "I63.3", "I63.4", "I63.5", "I63.6", "I63.8", "I63.9",
             "I64"),
   cerebral.hemorrhage = c("S06", "S06.0", "S06.1", "S06.2", "S06.3", "S06.4", "S06.5", "S06.6", "S06.7", "S06.8", "S06.9"),
-  mental.disease <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
+  mental.disease = paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
 )
 
 code.mental.disease <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
@@ -452,7 +464,7 @@ code.radiotherapy <- c( # Radiotherapy codes (planned radiotherapy for readmissi
 code.cci <- list(
   MI = c("I21", "I22", "I252"),
   CHF = c(paste0("I", c("099", 110, 130, 132, 255, 420, 425:429, 43, 50)), "P290"),
-  Peripheral_VD = c(paste0("I", 70, 71, 731, 738, 739, 771, 790, 792), paste0("K", c(551, 558, 559)), "Z958", "Z959"),
+  Peripheral_VD = c(paste0("I", c(70, 71, 731, 738, 739, 771, 790, 792)), paste0("K", c(551, 558, 559)), "Z958", "Z959"),
   Cerebro_VD = c("G45", "G46", "H340", paste0("I", 60:69)),
   Dementia = c(paste0("F0", c(0:3, 51)), "G30", "G311"),
   Chronic_pulmonary_dz = c("I278", "I279", paste0("J", c(40:47, 60:67, 684, 701, 703))),
@@ -520,10 +532,83 @@ t20 <- read_fst("study1/data/t20.fst", as.data.table = T)
 
 
 ## subject
+
+```{r}
+t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
+
+setkey(t30, CMN_KEY)
+
+# Robotic prostatectomy 케이스 구하기 
+robotic.prostate.candidates <- t30[MCARE_DIV_CD_ADJ %in% c(code.robot, code.anesthesia, code.pathology, code.prostate.std), 
+                        .(CMN_KEY,
+                          has_robot = any(MCARE_DIV_CD_ADJ %in% code.robot),
+                          has_anesthesia = any(MCARE_DIV_CD_ADJ %in% code.anesthesia),
+                          has_pathology = any(MCARE_DIV_CD_ADJ %in% code.pathology),
+                          has_prostate = any(MCARE_DIV_CD_ADJ %in% code.prostate.std) ), by = CMN_KEY]
+
+# write_fst(robotic.prostate.candidates, "data/robotic_candidate.fst")
+# robotic.prostate.candidates <- read_fst("data/robotic_candidate.fst")
+
+
+# Condition: Robot AND Anesthesia AND Pathology AND NOT Standard Prostatectomy
+robotic.keys <- robotic.prostate.candidates[has_robot & has_anesthesia & has_pathology & !has_prostate, CMN_KEY]
+
+
+t30_robotic <- t30[CMN_KEY %in% robotic.keys & MCARE_DIV_CD_ADJ %in% code.robot, ]
+# write_fst(t30_robotic, "data/t30_robotic.fst")
+# t30_robotic <- read_fst("data/t30_robotic.fst")
+
+
+t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), ], t30_robotic)
+# write_fst(t30_all, "data/t30_all.fst")
+# t30_all <- read_fst("data/t30_all.fst")
+
+target_key <- t30_all$CMN_KEY %>% unique 
+saveRDS(target_key, "data/target_key.rds")
+```
+
+
+## target
 ```{r}
 t20 <- read_fst("data/t20.fst", as.data.table = T)
+target_key <- readRDS("data/target_key.rds")
 
-t20_target <- t20[]
+t20_target <- t20[CMN_KEY %in% target_key, ]
+# write_fst(t20_target, "data/t20_target.fst")
+# t20_target <- read_fst("data/t20_target.fst")
+
+```
+
+
+## exclusion criteria
+```{r}
+attr = list("대수술 받은 사람:" = nrow(t20_target))
+
+#exclusion1: 대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외
+
+t20_excl_disease_whole <- t20[SICK_SYM1 %in% code.excl.disease | SICK_SYM2 %in% code.excl.disease | SICK_SYM3 %in% code.excl.disease| SICK_SYM4 %in% code.excl.disease| SICK_SYM5 %in% code.excl.disease , .(INDI_DSCM_NO, Disease_date= MDCARE_STRT_DT)] #CMN_KEY
+# write_fst(t20_excl_disease_whole, "data/t20_excl_disease_whole.fst")
+# t20_excl_disease_whole <- read_fst("data/t20_excl_disease_whole.fst")
+
+
+# merged_data <- merge(t20_target, t20_excl_disease_whole, by="INDI_DSCM_NO")
+# t <- merged_data[difftime(as.Date(MDCARE_STRT_DT, format="%Y%m%d"), as.Date(Disease_date, format="%Y%m%d"), units="days") <= 365.25*5, ]
+
+
+## 5년내 환자들만 확인
+t20_past_5yr_disease_whole <- merge(t20_target, t20_excl_disease_whole, by="INDI_DSCM_NO") %>% 
+  .[difftime(as.Date(MDCARE_STRT_DT, format="%Y%m%d"), as.Date(Disease_date, format="%Y%m%d"), units="days") <= 365.25*5, ]
+
+# write_fst(t20_past_5yr_disease_whole, "data/t20_past_5yr_disease_whole.fst")
+# t20_past_5yr_disease_whole <- read_fst("data/t20_past_5yr_disease_whole.fst")
+
+
+excl_patients_id <- t20_past_5yr_disease_whole$INDI_DSCM_NO %>% unique
+t20_target <- t20_target[!excl_patients_id, on="INDI_DSCM_NO"]
+
+attr$`Exclusion1: 대수술 받기 전 5년내 과거력 환자 제외 후: ` <- nrow(t20_target)
+
+
 
 
 ```
