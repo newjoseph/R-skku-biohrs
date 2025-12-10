@@ -13,6 +13,7 @@ library(data.table);library(magrittr);library(fst);library(openxlsx);library(par
 
 setwd("/home/minhyuk.kim/ShinyApps/R-skku-biohrs/study")
 setDTthreads(0)  ## 0: All
+options(scipen = 999)
 ```
 
 
@@ -111,19 +112,27 @@ code.dep.drug <- list(
 )
 
 # exclude diseases
+# code.excl.disease <- list(
+#   dementia = c("F00", "F01", "F02", "F03", "F051", "G30", "G311"),
+#   Parkinson = c("G20"),
+#   stroke  = c("I60", "I60.0", "I60.1", "I60.2", "I60.3", "I60.4", "I60.5", "I60.6", "I60.7", "I60.8", "I60.9",
+#             "I61", "I61.0", "I61.1", "I61.2", "I61.3", "I61.4", "I61.5", "I61.6", "I61.8", "I61.9",
+#             "I62", "I62.0", "I62.1", "I62.9",
+#             "I63", "I63.0", "I63.1", "I63.2", "I63.3", "I63.4", "I63.5", "I63.6", "I63.8", "I63.9",
+#             "I64"),
+#   cerebral.hemorrhage = c("S06", "S06.0", "S06.1", "S06.2", "S06.3", "S06.4", "S06.5", "S06.6", "S06.7", "S06.8", "S06.9"), 
+#   mental.disease = paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34)))
+# )
+
 code.excl.disease <- list(
   dementia = c("F00", "F01", "F02", "F03", "F051", "G30", "G311"),
   Parkinson = c("G20"),
-  stroke  = c("I60", "I60.0", "I60.1", "I60.2", "I60.3", "I60.4", "I60.5", "I60.6", "I60.7", "I60.8", "I60.9",
-            "I61", "I61.0", "I61.1", "I61.2", "I61.3", "I61.4", "I61.5", "I61.6", "I61.8", "I61.9",
-            "I62", "I62.0", "I62.1", "I62.9",
-            "I63", "I63.0", "I63.1", "I63.2", "I63.3", "I63.4", "I63.5", "I63.6", "I63.8", "I63.9",
-            "I64"),
-  cerebral.hemorrhage = c("S06", "S06.0", "S06.1", "S06.2", "S06.3", "S06.4", "S06.5", "S06.6", "S06.7", "S06.8", "S06.9"),
-  mental.disease = paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
+  stroke  = c("I60", "I61", "I62", "I63", "I64"),
+  cerebral.hemorrhage = c("S06"), 
+  mental.disease = paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34)))
 )
 
-code.mental.disease <- paste(paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34))), collapse = "|")
+code.mental.disease <- paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34)))
 
 
 # PDT, PCA code - include
@@ -433,13 +442,13 @@ code.opiode.drug.named <- with(
 ## 확인 필요 
 # Cardiovascular outcome 
 code.cardiovascular <- list(
-  acute.myocardial.infarction = c("I21", "I22", "I23", "I24"),
+  acute.myocardial.infarction = paste0(c("I21", "I22", "I23", "I24"),collapse="|"),
   angina.pectoris = c("I20"),
-  congestive.heart.failure = c("I09.9", "I11.0", "I13.2", "I25.5", "I42", "I42.0", "I42.5", "I42.6", "I42.7", "I42.8", "I42.9", "I43", "I43.0", "I43.1", "I43.2", "I43.8", "I43.9", "I50", "I50.0", "I50.1", "I50.9", "P29.0")
+  congestive.heart.failure = paste0(c("I09.9", "I11.0", "I13.2", "I25.5", "I42", "I42.0", "I42.5", "I42.6", "I42.7", "I42.8", "I42.9", "I43", "I43.0", "I43.1", "I43.2", "I43.8", "I43.9", "I50", "I50.0", "I50.1", "I50.9", "P29.0"), collapse="|")
   )
 
 
-code.AF <- c("I48", "I48.0", "I48.1", "I48.2", "I48.3", "I48.4", "I48.9")
+code.AF <- paste0(c("I48", "I48.0", "I48.1", "I48.2", "I48.3", "I48.4", "I48.9"), collapse ="|")
 
 code.hospitalized <- c("2", "4", "7", "10", "12")
 
@@ -461,31 +470,6 @@ code.radiotherapy <- c( # Radiotherapy codes (planned radiotherapy for readmissi
 )
 
 
-code.cci <- list(
-  MI = c("I21", "I22", "I252"),
-  CHF = c(paste0("I", c("099", 110, 130, 132, 255, 420, 425:429, 43, 50)), "P290"),
-  Peripheral_VD = c(paste0("I", c(70, 71, 731, 738, 739, 771, 790, 792)), paste0("K", c(551, 558, 559)), "Z958", "Z959"),
-  Cerebro_VD = c("G45", "G46", "H340", paste0("I", 60:69)),
-  Dementia = c(paste0("F0", c(0:3, 51)), "G30", "G311"),
-  Chronic_pulmonary_dz = c("I278", "I279", paste0("J", c(40:47, 60:67, 684, 701, 703))),
-  Rheumatologic_dz = paste0("M", c("05", "06", 315, 32:34, 351, 353, 360)),
-  Peptic_ulcer_dz = paste0("K", 25:28),
-  Mild_liver_dz = c("B18", paste0("K", c(700:703, 709, 713:715, 717, 73, 74, 760, 762:764, 768, 769)), "Z944"),
-  DM_no_complication = paste0("E", c(100, 101, 106, 108:111, 116, 118:121, 126, 128:131, 136, 138:141, 146, 148, 149)),
-  DM_complication = paste0("E", c(102:105, 107, 112:115, 117, 122:125, 127, 132:135, 137, 142:145, 147)),
-  Hemi_paraplegia = paste0("G", c("041", 114, 801, 802, 81, 82, 830:834, 839)),
-  Renal_dz = c("I120", "I131", paste0("N", c("032", "033", "034", "035", "036", "037",
-                                             18, 19, 250)), paste0("Z", c(490:492, 940, 992))),
-  # C73 (갑상선암) 제외, C76은 Metastatic_solid_tumor로 이동
-  Malig_with_Leuk_lymphoma = paste0("C", c(paste0("0", 0:9), 10:26, 30:34, 37:41, 43, 45:58, 60:72, 74:75, 81:85, 88, 90, 97)),
-  Moderate_severe_liver_dz = c(paste0("I", c(85, 859, 864, 982)), paste0("K", c(704, 711, 721, 729, 765:767))),
-  # C76-C80 범위로 수정
-  Metastatic_solid_tumor = paste0("C", 76:80),
-  # B20-B24 전체 포함
-  AIDS_HIV = paste0("B", c(20:24))
-)
-cciscore <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 6, 6, 2)
-names(cciscore) <- names(code.cci)
 
 
 
@@ -539,15 +523,27 @@ t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
 setkey(t30, CMN_KEY)
 
 # Robotic prostatectomy 케이스 구하기 
-robotic.prostate.candidates <- t30[MCARE_DIV_CD_ADJ %in% c(code.robot, code.anesthesia, code.pathology, code.prostate.std), 
+# robotic.prostate.candidates <- t30[MCARE_DIV_CD_ADJ %in% c(code.robot, code.anesthesia, code.pathology, code.prostate.std), 
+#                         .(CMN_KEY,
+#                           has_robot = any(MCARE_DIV_CD_ADJ %in% code.robot),
+#                           has_anesthesia = any(MCARE_DIV_CD_ADJ %in% code.anesthesia),
+#                           has_pathology = any(MCARE_DIV_CD_ADJ %in% code.pathology),
+#                           has_prostate = any(MCARE_DIV_CD_ADJ %in% code.prostate.std) ), by = CMN_KEY]
+robotic.prostate.candidates <- t30[MCARE_DIV_CD_ADJ %like% paste(c(code.robot, code.anesthesia, code.pathology, code.prostate.std), collapse="|"), 
                         .(CMN_KEY,
-                          has_robot = any(MCARE_DIV_CD_ADJ %in% code.robot),
-                          has_anesthesia = any(MCARE_DIV_CD_ADJ %in% code.anesthesia),
-                          has_pathology = any(MCARE_DIV_CD_ADJ %in% code.pathology),
-                          has_prostate = any(MCARE_DIV_CD_ADJ %in% code.prostate.std) ), by = CMN_KEY]
-
+                          has_robot = any(MCARE_DIV_CD_ADJ %like% paste(code.robot, collapse="|")),
+                          has_anesthesia = any(MCARE_DIV_CD_ADJ %like% paste(code.robot, collapse="|")),
+                          has_pathology = any(MCARE_DIV_CD_ADJ %like% paste(code.pathology, collapse="|")),
+                          has_prostate = any(MCARE_DIV_CD_ADJ %like% paste(code.prostate.std, collapse="|"))), by = CMN_KEY]
 # write_fst(robotic.prostate.candidates, "data/robotic_candidate.fst")
 # robotic.prostate.candidates <- read_fst("data/robotic_candidate.fst")
+
+
+# tt <-  t30[MCARE_DIV_CD_ADJ %like% paste(c(code.robot, code.anesthesia, code.pathology, code.prostate.std), collapse="|"),]
+# tt.code <- tt$MCARE_DIV_CD_ADJ %>% unique %>% sort()
+# saveRDS(tt.code, "MCARE_code.rds")
+
+
 
 
 # Condition: Robot AND Anesthesia AND Pathology AND NOT Standard Prostatectomy
@@ -559,11 +555,12 @@ t30_robotic <- t30[CMN_KEY %in% robotic.keys & MCARE_DIV_CD_ADJ %in% code.robot,
 # t30_robotic <- read_fst("data/t30_robotic.fst")
 
 
-t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), ], t30_robotic)
+# t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), ], t30_robotic)
+t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %like% paste0(unlist(code.surgery), collapse="|"), ], t30_robotic)
 # write_fst(t30_all, "data/t30_all.fst")
 # t30_all <- read_fst("data/t30_all.fst")
 
-target_key <- t30_all$CMN_KEY %>% unique 
+target_key <- t30_all$CMN_KEY %>% unique
 saveRDS(target_key, "data/target_key.rds")
 ```
 
@@ -571,9 +568,12 @@ saveRDS(target_key, "data/target_key.rds")
 ## target
 ```{r}
 t20 <- read_fst("data/t20.fst", as.data.table = T)
+options(scipen = 999)
 target_key <- readRDS("data/target_key.rds")
 
-t20_target <- t20[CMN_KEY %in% target_key, ]
+
+t20_target <- t20[CMN_KEY %in% target_key]
+t20_target_raw <- copy(t20_target)
 # write_fst(t20_target, "data/t20_target.fst")
 # t20_target <- read_fst("data/t20_target.fst")
 
@@ -586,7 +586,9 @@ attr = list("대수술 받은 사람:" = nrow(t20_target))
 
 #exclusion1: 대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외
 
-t20_excl_disease_whole <- t20[SICK_SYM1 %in% code.excl.disease | SICK_SYM2 %in% code.excl.disease | SICK_SYM3 %in% code.excl.disease| SICK_SYM4 %in% code.excl.disease| SICK_SYM5 %in% code.excl.disease , .(INDI_DSCM_NO, Disease_date= MDCARE_STRT_DT)] #CMN_KEY
+t20_excl_disease_whole <- t20[SICK_SYM1 %like% paste0(unlist(code.excl.disease), collapse="|")
+                               | SICK_SYM2 %like% paste0(unlist(code.excl.disease),collapse="|"),
+                              .(INDI_DSCM_NO, Disease_date= MDCARE_STRT_DT)] #CMN_KEY
 # write_fst(t20_excl_disease_whole, "data/t20_excl_disease_whole.fst")
 # t20_excl_disease_whole <- read_fst("data/t20_excl_disease_whole.fst")
 
@@ -604,10 +606,62 @@ t20_past_5yr_disease_whole <- merge(t20_target, t20_excl_disease_whole, by="INDI
 
 
 excl_patients_id <- t20_past_5yr_disease_whole$INDI_DSCM_NO %>% unique
+# saveRDS(excl_patients_id, "data/excl_patients_id.rds")
+options(scipen = 999)
+# excl_patients_id <- readRDS("data/excl_patients_id.rds")
+
 t20_target <- t20_target[!excl_patients_id, on="INDI_DSCM_NO"]
 
 attr$`Exclusion1: 대수술 받기 전 5년내 과거력 환자 제외 후: ` <- nrow(t20_target)
 
+
+```
+
+## CCI 계산
+
+```{r}
+t40 <- read_fst("/home/minhyuk.kim/knhis_data/T40.fst", as.data.table = T)
+```
+
+
+
+```{r}
+code.cci <- list(
+  MI = c("I21", "I22", "I25"),
+  CHF = c(paste0("I", c("099", 110, 130, 132, 255, 420, 425:429, 43, 50)), "P290"),
+  Peripheral_VD = c(paste0("I", c(70, 71, 731, 738, 739, 771, 790, 792)), paste0("K", c(551, 558, 559)), "Z958", "Z959"),
+  Cerebro_VD = c("G45", "G46", "H340", paste0("I", 60:69)),
+  Dementia = c(paste0("F0", c(0:3, 51)), "G30", "G311"),
+  Chronic_pulmonary_dz = c("I278", "I279", paste0("J", c(40:47, 60:67, 684, 701, 703))),
+  Rheumatologic_dz = paste0("M", c("05", "06", 315, 32:34, 351, 353, 360)),
+  Peptic_ulcer_dz = paste0("K", 25:28),
+  # Mild_liver_dz에 B19 추가
+  Mild_liver_dz = c("B18", "B19", paste0("K", c(700:703, 709, 713:715, 717, 73, 74, 760, 762:764, 768, 769)), "Z944"),
+  DM_no_complication = paste0("E", c(100, 101, 106, 108:111, 116, 118:121, 126, 128:131, 136, 138:141, 146, 148, 149)),
+  DM_complication = paste0("E", c(102:105, 107, 112:115, 117, 122:125, 127, 132:135, 137, 142:145, 147)),
+  Hemi_paraplegia = paste0("G", c("041", 114, 801, 802, 81, 82, 830:834, 839)),
+  # Renal_dz N17 추가
+  Renal_dz = c("I120", "I131", paste0("N", c("032", "033", "034", "035", "036", "037",
+                                             17, 18, 19, 250)), paste0("Z", c(490:492, 940, 992))),
+  # C73 (갑상선암) 제외, C76은 Metastatic_solid_tumor로 이동
+  Malig_with_Leuk_lymphoma = paste0("C", c(paste0("0", 0:9), 10:26, 30:34, 37:41, 43, 45:58, 60:72, 74:75, 81:85, 88, 90, 97)),
+  Moderate_severe_liver_dz = c(paste0("I", c(85, 859, 864, 982)), paste0("K", c(704, 711, 721, 729, 765:767))),
+  # C76-C80 범위로 수정
+  Metastatic_solid_tumor = paste0("C", 76:80),
+  # B20-B24 전체 포함
+  AIDS_HIV = paste0("B", c(20:24))
+)
+cciscore <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 6, 6)
+names(cciscore) <- names(code.cci)
+
+
+
+mclapply(names(code.cci), function(x){
+  
+  t20_target 
+  
+  
+})
 
 
 
