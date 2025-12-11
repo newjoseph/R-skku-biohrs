@@ -516,7 +516,7 @@ t30_robotic <- t30[CMN_KEY %in% robotic.keys & MCARE_DIV_CD_ADJ %in% code.robot,
 # t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %in% unlist(code.surgery), ], t30_robotic)
 t30_all <- rbind( t30[MCARE_DIV_CD_ADJ %like% paste0(unlist(code.surgery), collapse="|"), ], t30_robotic)
 # write_fst(t30_all, "data/t30_all.fst")
-# t30_all <- read_fst("data/t30_all.fst")
+# t30_all <- read_fst("data/t30_all.fst", as.data.table=T)
 
 target_key <- t30_all$CMN_KEY %>% unique
 saveRDS(target_key, "data/target_key.rds")
@@ -709,11 +709,11 @@ aa <- g1eq[, .(INDI_DSCM_NO,
 t20_target <- merge(t20_target, aa, by=c("INDI_DSCM_NO", "STD_YYYY"))
 
 
-
-
-
 # Surgery Type
-# t20_target[, Surgery_Type := code.surgery.named[MCARE_DIV_CD_ADJ]]
+t20_target[,CMN_KEY := bit64::as.integer64(CMN_KEY)]
+
+t20_target <- merge(t20_target, t30_all[, .(CMN_KEY, MCARE_DIV_CD_ADJ)], by="CMN_KEY")
+t20_target[, surgery_type := code.surgery.named[substr(MCARE_DIV_CD_ADJ,1,5)]]
 
 
 
