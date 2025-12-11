@@ -662,34 +662,54 @@ t20_target[, Death := fifelse(is.na(death_date),0,1)]
 t20_target[, FU_days := as.integer(pmin(as.Date(as.character(death_date), format="%Y%m%d"), as.Date("2013-12-31"), na.rm=T) - as.Date(Indexdate, format="%Y%m%d"))]
 
 
-# Age
+## Age & Income 
+
 # bfc <- read_fst("/home/minhyuk.kim/knhis_data/BFC.fst", as.data.table = T)
 # bfc <- bfc[STD_YYYY %in% c(2002:2013)]
 # write_fst(bfc, "data/bfc.fst")
 
 bfc <- read_fst("data/bfc.fst", as.data.table = T)
 
-# bfc.dt <- unique(bfc[, .(INDI_DSCM_NO, SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
-#                insurance_fee = CALC_CTRB_FD, insurance_quantile = CALC_CTRB_VTILE_FD), keyby=c("STD_YYYY", "INDI_DSCM_NO")])
 
-bfc.dt2 <- unique(bfc[, .(STD_YYYY,  SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
-                         insurance_fee = CALC_CTRB_FD, insurance_quantile = CALC_CTRB_VTILE_FD), by=INDI_DSCM_NO])
-bfc.dt2[1:15,]
-
-t20_target[, INDI_DSCM_NO := as.integer(INDI_DSCM_NO)]
-
-# t <- merge(t20_target, unique(bfc[, .(STD_YYYY,  SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
-#                                       insurance_fee = CALC_CTRB_FD, insurance_quantile = CALC_CTRB_VTILE_FD), by=INDI_DSCM_NO]), by="INDI_DSCM_NO", all.x=T)
+t20_target <- merge(t20_target[, STD_YYYY:= substr(Indexdate, 1,4)], unique(bfc[, .(STD_YYYY, SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
+                                       insurance_quantile = CALC_CTRB_VTILE_FD), by=INDI_DSCM_NO]), by=c("INDI_DSCM_NO", "STD_YYYY"), all.x=T)  # insurance_fee = CALC_CTRB_FD, disablity_code := CMPR_DSB_GRADE
+rm(bfc)
 
 
-tt <- merge(t20_target, unique(bfc[, .(SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
-                                      insurance_fee = CALC_CTRB_FD, insurance_quantile = CALC_CTRB_VTILE_FD), by=INDI_DSCM_NO]), by="INDI_DSCM_NO", all.x=T)
+# 보험료 순위: 0~6, 7~13, 14~20
+t20_target[, income_tertile := ifelse(insurance_quantile %in% c(0:6), 1,
+                                  ifelse(insurance_quantile %in% c(7:13), 2, 3))]
 
-tt %>% head(17)
+# Age
+t20_target[, Age := as.numeric(substr(Indexdate,1,4)) - as.numeric(substr(BYEAR,1,4))]
+t20_target <- t20_target[Age>=18, ]
+attr$`Exclusion2: Age >=18` = nrow(t20_target)
 
 
-t <- merge(t20_target, unique(bfc[, .(INDI_DSCM_NO, SEX = SEX_TYPE[1], BYEAR,  disablity_type = MAIN_DSB_TYPE,
-                               insurance_fee = CALC_CTRB_FD, insurance_quantile = CALC_CTRB_VTILE_FD), keyby="INDI_DSCM_NO"]), by="INDI_DSCM_NO") #disablity_code := CMPR_DSB_GRADE
+t20_target[, Age_group := ifelse(Age<65, "18-64", "65+")]
+
+ob_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2002.csv") %>% as.data.table()
+g1eq <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_0217.csv") %>% as.data.table()
+g1eq <- g1eq[EXMD_BZ_YYYY %in% c(2002:2013), ]
+
+aa <- g1eq[, .(INDI_DSCM_NO,
+               STD_YYYY = as.character(EXMD_BZ_YYYY),
+               BMI = G1E_BMI, 
+               drink_freq = Q_DRK_FRQ_V0108, 
+               drink_amount = Q_DRK_AMT_V0108, 
+               smoke=Q_SMK_YN,
+               exercise_freq = Q_PA_FRQ,
+               #exercise_per_time = Q_PA_DRT,
+               exercise_freq_v = Q_PA_VD,
+               exercise_freq_m = Q_PA_MD,
+               exercise_freq_walk = Q_PA_WALK
+               ) ]
+
+
+t20_target <- merge(t20_target, aa, by=c("INDI_DSCM_NO", "STD_YYYY"))
+
+
+
 
 
 # Surgery Type
