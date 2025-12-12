@@ -63,7 +63,7 @@ code.other.major <- c(code.surgery$stomach, code.surgery$colon, code.surgery$pro
 
 
 # depression
-code.DEP <- paste(c("F32.0", "F32.1", "F32.2", "F32.3", "F32.8", "F32.9", "F33.0", "F33.1", "F33.2", "F33.3", "F33.8", "F33.9"), collapse = "|")
+code.dep <- paste(c("F32.0", "F32.1", "F32.2", "F32.3", "F32.8", "F32.9", "F33.0", "F33.1", "F33.2", "F33.3", "F33.8", "F33.9"), collapse = "|")
 
 # 교수님 확인후 추가 필요 
 code.dep.drug <- list(
@@ -626,8 +626,8 @@ cci_res <- mclapply(names(code.cci), function(x){
   
   
   #t <- dt1[t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = 365*5]
-  ## CCI calculation
-  out1 <- dt1[t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = 365*5] %>%
+  ## CCI calculation: 전체 과거력 확인 
+  out1 <- dt1[t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
     .[, cci_event := as.integer(!is.na(Incident_Date))  ] %>% 
     .[,cci_event] * cciscore[x]
   
@@ -739,12 +739,21 @@ t20_target[, surgery_type := code.surgery.named[substr(MCARE_DIV_CD_ADJ,1,5)]]
 # opioid consumption 
 
 
+# Depression
+t20 <- read_fst("study/data/t20.fst", as.data.table = T)
+write_fst(t20[ SICK_SYM1 %like% unlist(code.dep) | SICK_SYM2 %like% unlist(code.dep), ], "data/t20_dep_whole.fst")
+t20_dep_whole <- read_fst("data/t20_dep_whole.fst", as.data.table = T)
+
+
+
+
+
 # Dementia
 
-t20 <- read_fst("study/data/t20.fst", as.data.table = T)
+
 options(scipen = 999)
-#write_fst(t20[ SICK_SYM1 %like% unlist(code.dementia) | SICK_SYM2 %like% unlist(code.dementia), ], "data/t20_dementia.fst")
-t20_dementia <- read_fst("data/t20_dementia.fst", as.data.table = T)
+#write_fst(t20[ SICK_SYM1 %like% unlist(code.dementia) | SICK_SYM2 %like% unlist(code.dementia), ], "data/t20_dementia_whole.fst")
+t20_dementia_whole <- read_fst("data/t20_dementia_whole.fst", as.data.table = T)
 
 
 t60 <- read_fst("/home/minhyuk.kim/knhis_data/T60.fst", as.data.table = T)
@@ -763,6 +772,9 @@ dementia_whole <- merge(t20_dementia[, .(CMN_KEY = bit64::as.integer64(CMN_KEY),
                         t30_60_dementia[, .(CMN_KEY, dimentia_drug = MCARE_DIV_CD_ADJ )], by="CMN_KEY")
 
 
+
+dementia_whole[ , N := .N, by=]
+dementia_whole <- dementia_whole[N]
 
 # Cardiovascular
 
