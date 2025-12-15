@@ -709,57 +709,317 @@ gq_rst_19 <- read.csv("/home/minhyuk.kim/knhis_data/gq_rst_2019.csv") %>% as.dat
 g1eq <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_0217.csv") %>% as.data.table()
 g1eq <- g1eq[EXMD_BZ_YYYY %in% c(2002:2013), ]
 
-# aa <- g1eq[, .(INDI_DSCM_NO,
-#                STD_YYYY = as.character(EXMD_BZ_YYYY),
-#                BMI = G1E_BMI, 
-#                drink_freq = Q_DRK_FRQ_V0108, 
-#                drink_amount = Q_DRK_AMT_V0108, 
-#                smoke=Q_SMK_YN,
-#                exercise_freq = Q_PA_FRQ,
-#                #exercise_per_time = Q_PA_DRT,
-#                exercise_freq_v = Q_PA_VD,
-#                exercise_freq_m = Q_PA_MD,
-#                exercise_freq_walk = Q_PA_WALK
-#                ) ]
 
-a <-  g1eq[, .(INDI_DSCM_NO,
-               STD_YYYY = as.character(EXMD_BZ_YYYY),
-               BMI = G1E_BMI, 
-               drink_freq = Q_DRK_FRQ_V0108, 
-               drink_amount = Q_DRK_AMT_V0108, 
+gq_0208 <- lapply(c(2002:2008), function(yr){
+  
+  read.csv(paste0("/home/minhyuk.kim/knhis_data/g1eq_", yr,".csv")) %>% as.data.table()
+  
+}) %>% do.call(rbind, .) 
+
+
+gq_0208_origin <- copy(gq_0208)
+
+
+gq_0208 <- gq_0208[, .(INDI_DSCM_NO,
+               HC_BZ_YYYY = as.character(EXMD_BZ_YYYY),
+               HC_DT = HME_DT,
+               BMI = G1E_BMI,
+               drink_freq = Q_DRK_FRQ_V0108,
+               alcohol_per_time = Q_DRK_AMT_V0108,
                smoke=Q_SMK_YN,
-               regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0),
-               exercise_per_time = Q_PA_DRT,
-               exercise_freq_v = Q_PA_VD,
-               exercise_freq_m = Q_PA_MD)]
+               #exercise_freq = Q_PA_FRQ,
+               #exercise_per_time = Q_PA_DRT,
+               # exercise_freq_v = Q_PA_VD,
+               # exercise_freq_m = Q_PA_MD,
+               #exercise_freq_walk = Q_PA_WALK
+               regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0)
+               ) ] %>% unique
 
 
-g1eq0913[, .(INDI_DSCM_NO,
-         STD_YYYY = as.character(EXMD_BZ_YYYY),
-         BMI = G1E_BMI, 
-         drink_freq = Q_DRK_FRQ_V0108, 
-         drink_amount = Q_DRK_AMT_V0108, 
-         smoke=Q_SMK_YN,
-         regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0),
-         exercise_per_time = Q_PA_DRT,
-         exercise_freq_v = Q_PA_VD,
-         exercise_freq_m = Q_PA_MD)]
+#소주 1병 = 360 mL, 알코올 도수 20%
+# → 순수 알코올 약 57.6 g (360 × 0.2 × 0.8)
+gq_0208[, total_alcohol_consumption :=  ifelse(drink_freq == 1, 0, #거의 마시지 않는다 → 0일/주
+                                     ifelse(drink_freq == 2, 0.625, #월 2~3회 정도 마신다 → 0.625일/주 
+                                            ifelse(drink_freq == 3, 1.5, # 일주일에 1~2회 마신다 → 1.5일/주
+                                                   ifelse(drink_freq == 4, 3.5, # 일주일에 3~4회 마신다 → 3.5일/주
+                                                          ifelse(drink_freq == 5, 6.5, # 거의 매일 마신다 → 6.5일/주 
+                                                                 0))))) # NA는 0으로 
+                              * ifelse(!is.na(alcohol_per_time), alcohol_per_time * 0.5 , 0)
+                              * 57.6 ] # 알코올 비중이 0.8 vs 0.785
+
+gq_0208[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
+                             ifelse(total_alcohol_consumption < 105 , "Mild",
+                                    ifelse(total_alcohol_consumption < 210, "Moderate",
+                                           ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
+
+gq_0208[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
 
 
-t20_target <- merge(t20_target, 
-                    g1eq[, .(INDI_DSCM_NO,
-                             STD_YYYY = as.character(EXMD_BZ_YYYY),
-                             BMI = G1E_BMI, 
-                             drink_freq = Q_DRK_FRQ_V0108, 
-                             drink_amount = Q_DRK_AMT_V0108, 
-                             smoke=Q_SMK_YN,
-                             regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0)
-                             #exercise_per_time = Q_PA_DRT,
-                             # exercise_freq_v = Q_PA_VD,
-                             # exercise_freq_m = Q_PA_MD,
-                             ) ],
-                    by=c("INDI_DSCM_NO", "STD_YYYY"), all.x = T)
-rm(g1eq)
+
+# ifelse(drink_freq == 1, 0, #거의 마시지 않는다 → 0일/주
+#        ifelse(drink_freq == 2, 0.625, #월 2~3회 정도 마신다 → 0.625일/주 
+#               ifelse(drink_freq == 3, 1.5, # 일주일에 1~2회 마신다 → 1.5일/주
+#                      ifelse(drink_freq == 4, 3.5, # 일주일에 3~4회 마신다 → 3.5일/주
+#                             ifelse(drink_freq == 5, 6.5, # 거의 매일 마신다 → 6.5일/주 
+#                                    0))))) # NA는 0으로 
+
+
+# 2009-2017
+
+gq_0917 <- lapply(c(2009:2017), function(yr){
+  
+  read.csv(paste0("/home/minhyuk.kim/knhis_data/g1eq_", yr,".csv")) %>% as.data.table()
+  
+}) %>% do.call(rbind, .) 
+
+
+gq_0917 %>% head
+gq_0917_origin <- copy(gq_0917)
+
+gq_0917 <- gq_0917[, .(INDI_DSCM_NO,
+            HC_BZ_YYYY = as.character(EXMD_BZ_YYYY),
+            HC_DT = HME_DT,
+            BMI = G1E_BMI,
+            drink_freq = Q_DRK_FRQ_V09N,
+            alcohol_per_time = Q_DRK_AMT_V09N,
+            smoke=Q_SMK_YN,
+            #exercise_freq = Q_PA_FRQ,
+            #exercise_per_time = Q_PA_DRT,
+            # exercise_freq_v = Q_PA_VD,
+            # exercise_freq_m = Q_PA_MD,
+            #exercise_freq_walk = Q_PA_WALK
+            regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0)
+) ] %>% unique
+
+
+gq_0917[, total_alcohol_consumption :=  ifelse(drink_freq == 1, 0, #거의 마시지 않는다 → 0일/주
+                                               ifelse(drink_freq == 2, 0.625, #월 2~3회 정도 마신다 → 0.625일/주 
+                                                      ifelse(drink_freq == 3, 1.5, # 일주일에 1~2회 마신다 → 1.5일/주
+                                                             ifelse(drink_freq == 4, 3.5, # 일주일에 3~4회 마신다 → 3.5일/주
+                                                                    ifelse(drink_freq == 5, 6.5, # 거의 매일 마신다 → 6.5일/주 
+                                                                           0))))) # NA는 0으로 
+        * ifelse(!is.na(alcohol_per_time), alcohol_per_time * 0.5 , 0)
+        * 57.6 ] # 알코올 비중이 0.8 vs 0.785
+
+gq_0917[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
+                                 ifelse(total_alcohol_consumption < 105 , "Mild",
+                                        ifelse(total_alcohol_consumption < 210, "Moderate",
+                                               ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
+
+gq_0917[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+# 2018
+gq_18 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_rst_2018.csv") %>% as.data.table()
+gq_18_origin <- copy(gq_18)
+
+gq_18 <- gq_18[, .(INDI_DSCM_NO,
+                   HC_BZ_YYYY = as.character(EXMD_BZ_YYYY),
+                   HC_DT = HME_DT,
+                   BMI = G1E_BMI)] %>% unique
+
+
+# 2019-2021
+gq_1921 <- lapply(c(2019:2021), function(yr){
+  
+  read.csv(paste0("/home/minhyuk.kim/knhis_data/g1e_rst_", yr,".csv")) %>% as.data.table()
+  
+}) %>% do.call(rbind, .) 
+
+gq_1921_origin <- copy(gq_1921)
+
+gq_1921 <- gq_1921[, .(INDI_DSCM_NO,
+                       HC_BZ_YYYY,
+                       HC_DT,
+                       BMI = G1E_BMI)] %>% unique
+
+# 추가 설문 
+
+
+gq_rst_18 <- read.csv("/home/minhyuk.kim/knhis_data/gq_rst_2018.csv") %>% as.data.table()
+gq_rst_18_origin <- copy(gq_rst_18)
+
+gq_rst_18 %>% head
+
+gq_rst_18 <- gq_rst_18[, .(INDI_DSCM_NO,
+                           smoke = Q_SMK_YN,
+                           Q_DRK_PER, Q_DRK_FRQ,
+                           Q_DRK_SOJU_SHOT, Q_DRK_SOJU_BTL, Q_DRK_SOJU_CAN,Q_DRK_SOJU_CC,
+                           Q_DRK_BEER_SHOT, Q_DRK_BEER_BTL, Q_DRK_BEER_CAN, Q_DRK_BEER_CC,
+                           Q_DRK_LQR_SHOT, Q_DRK_LQR_BTL, Q_DRK_LQR_CAN, Q_DRK_LQR_CC,
+                           Q_DRK_KLQR_SHOT, Q_DRK_KLQR_BTL ,Q_DRK_KLQR_CAN, Q_DRK_KLQR_CC,
+                           Q_DRK_WINE_SHOT, Q_DRK_WINE_BTL, Q_DRK_WINE_CAN, Q_DRK_WINE_CC,
+                           Q_PA_VD_FRQ, Q_PA_MD_FRQ)]
+                           # Q_DRK_MAX_SOJU_SHOT
+                           # Q_DRK_MAX_SOJU_BTL
+                           # Q_DRK_MAX_SOJU_CAN
+                           # Q_DRK_MAX_SOJU_CC
+                           # Q_DRK_MAX_BEER_SHOT
+                           # Q_DRK_MAX_BEER_BTL
+                           # Q_DRK_MAX_BEER_CAN
+                           # Q_DRK_MAX_BEER_CC
+                           # Q_DRK_MAX_LQR_SHOT
+                           # Q_DRK_MAX_LQR_BTL
+                           # Q_DRK_MAX_LQR_CAN
+                           # Q_DRK_MAX_LQR_CC
+                           # Q_DRK_MAX_KLQR_SHOT
+                           # Q_DRK_MAX_KLQR_BTL
+                           # Q_DRK_MAX_KLQR_CAN
+                           # Q_DRK_MAX_KLQR_CC
+                           # Q_DRK_MAX_WINE_SHOT
+                           # Q_DRK_MAX_WINE_BTL
+                           # Q_DRK_MAX_WINE_CAN
+                           # Q_DRK_MAX_WINE_CC
+
+gle_per_alcohol <- function(x){
+  
+  out <- lapply(x, function(i){
+    
+    if (is.na(i)==T){
+      return(NA)
+    }else if(x==1){ # 일주일 = 1주
+      return(1)
+    }else if(x==2){ # 한달 = 4주
+      return(0.25)
+    }else if(x==3){
+      return(0.02) # 일년 = 약 50주 
+    }else{
+      return(0)
+    }
+    
+  }) %>% do.call(rbind,. ) 
+}
+
+gq_rst_18[, PER := sapply(gq_rst_18$Q_DRK_PER, gle_per_alcohol)]
+
+
+container_volume = c(50,360,180,1,
+           200,640,355,1,
+           40,360,355,1,
+           230,750,350,1,
+           120,700,250,1)
+
+alcohol_vol_per_cc = c(17,17,12,17,
+                        4.5,4.5,4.5,4.5,
+                        40,40,7,40,
+                        6,6,6,6,
+                        12,12,12,12)
+
+alcohol_type = c("Q_DRK_SOJU_SHOT", "Q_DRK_SOJU_BTL", "Q_DRK_SOJU_CAN", "Q_DRK_SOJU_CC",
+                 "Q_DRK_BEER_SHOT", "Q_DRK_BEER_BTL", "Q_DRK_BEER_CAN", "Q_DRK_BEER_CC",
+                 "Q_DRK_LQR_SHOT", "Q_DRK_LQR_BTL", "Q_DRK_LQR_CAN", "Q_DRK_LQR_CC",
+                 "Q_DRK_KLQR_SHOT", "Q_DRK_KLQR_BTL" ,"Q_DRK_KLQR_CAN", "Q_DRK_KLQR_CC",
+                 "Q_DRK_WINE_SHOT", "Q_DRK_WINE_BTL", "Q_DRK_WINE_CAN", "Q_DRK_WINE_CC")
+
+
+gq_rst_18[, alcohol_per_time := (sapply(seq_along(alcohol_type), function(i){
+  
+  out <- get(alcohol_type[i]) * container_volume[i] * alcohol_vol_per_cc[i] * 0.785/100
+
+})) %>% rowSums ]
+
+
+
+gq_rst_18[, total_alcohol_consumption := alcohol_per_time * PER * Q_DRK_FRQ]
+gq_rst_18[, drink_freq := PER * Q_DRK_FRQ]
+gq_rst_18[, regular_exercise := ifelse(Q_PA_VD_FRQ >= 3 | Q_PA_MD_FRQ >= 5,1,0)]                           
+
+gq_rst_18[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
+                                 ifelse(total_alcohol_consumption < 105 , "Mild",
+                                        ifelse(total_alcohol_consumption < 210, "Moderate",
+                                               ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
+
+gq_rst_18[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+gq_rst_1921 <- lapply(c(2019:2021), function(yr){
+  
+  read.csv(paste0("/home/minhyuk.kim/knhis_data/gq_rst_", yr,".csv")) %>% as.data.table()
+  
+}) %>% do.call(rbind, .) 
+
+gq_rst_1921_origin <- copy(gq_rst_1921)
+
+gq_rst_1921 <- gq_rst_1921[, .(INDI_DSCM_NO, 
+                 HC_BZ_YYYY,
+                 HC_DT,
+                 smoke = Q_SMK_YN,
+                 Q_DRK_PER, Q_DRK_FRQ,
+                 Q_DRK_SOJU_SHOT, Q_DRK_SOJU_BTL, Q_DRK_SOJU_CAN, Q_DRK_SOJU_CC,
+                 Q_DRK_BEER_SHOT, Q_DRK_BEER_BTL, Q_DRK_BEER_CAN, Q_DRK_BEER_CC,
+                 Q_DRK_LQR_SHOT, Q_DRK_LQR_BTL, Q_DRK_LQR_CAN, Q_DRK_LQR_CC,
+                 Q_DRK_KLQR_SHOT, Q_DRK_KLQR_BTL, Q_DRK_KLQR_CAN, Q_DRK_KLQR_CC,
+                 Q_DRK_WINE_SHOT, Q_DRK_WINE_BTL, Q_DRK_WINE_CAN, Q_DRK_WINE_CC,
+                 Q_PA_VD_FRQ, Q_PA_MD_FRQ
+                 # Q_DRK_MAX_SOJU_SHOT, Q_DRK_MAX_SOJU_BTL, Q_DRK_MAX_SOJU_CAN, Q_DRK_MAX_SOJU_CC,
+                 # Q_DRK_MAX_BEER_SHOT,  Q_DRK_MAX_BEER_BTL, Q_DRK_MAX_BEER_CAN, Q_DRK_MAX_BEER_CC,
+                 # Q_DRK_MAX_LQR_SHOT,
+                 # Q_DRK_MAX_LQR_BTL,
+                 # Q_DRK_MAX_LQR_CAN,
+                 # Q_DRK_MAX_LQR_CC,
+                 # Q_DRK_MAX_KLQR_SHOT,
+                 # Q_DRK_MAX_KLQR_BTL,
+                 # Q_DRK_MAX_KLQR_CAN,
+                 # Q_DRK_MAX_KLQR_CC,
+                 # Q_DRK_MAX_WINE_SHOT,
+                 # Q_DRK_MAX_WINE_BTL,
+                 # Q_DRK_MAX_WINE_CAN,
+                 # Q_DRK_MAX_WINE_CC
+                 )] %>% unique
+
+gq_rst_1921[, alcohol_per_time := (sapply(seq_along(alcohol_type), function(i){
+  
+  out <- get(alcohol_type[i]) * container_volume[i] * alcohol_vol_per_cc[i] * 0.785/100
+  
+})) %>% rowSums ]
+
+gq_rst_1921[, PER := sapply(gq_rst_1921$Q_DRK_PER, gle_per_alcohol)]
+
+gq_rst_1921[, total_alcohol_consumption := alcohol_per_time * PER * Q_DRK_FRQ]
+gq_rst_1921[, drink_freq := PER * Q_DRK_FRQ]
+gq_rst_1921[, regular_exercise := ifelse(Q_PA_VD_FRQ >= 3 | Q_PA_MD_FRQ >= 5,1,0)]     
+
+gq_rst_1921[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
+                                 ifelse(total_alcohol_consumption < 105 , "Mild",
+                                        ifelse(total_alcohol_consumption < 210, "Moderate",
+                                               ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
+
+gq_rst_1921[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+
+## 2018 merge
+
+
+gq_18 <- merge(gq_18, 
+            gq_rst_18[,.(INDI_DSCM_NO, drink_freq, alcohol_per_time, smoke, regular_exercise, total_alcohol_consumption, alcohol_group, at_risk_drinking)],
+            by = "INDI_DSCM_NO")
+
+## 2019-2021 merge
+
+gq_1921 <- merge(gq_1921, 
+            gq_rst_1921[,.(INDI_DSCM_NO, drink_freq, alcohol_per_time, smoke, regular_exercise, total_alcohol_consumption, alcohol_group, at_risk_drinking)],
+            by = "INDI_DSCM_NO")
+
+
+
+
+
+
+# t20_target <- merge(t20_target, 
+#                     g1eq[, .(INDI_DSCM_NO,
+#                              STD_YYYY = as.character(EXMD_BZ_YYYY),
+#                              BMI = G1E_BMI, 
+#                              drink_freq = Q_DRK_FRQ_V0108, 
+#                              drink_amount = Q_DRK_AMT_V0108, 
+#                              smoke=Q_SMK_YN,
+#                              regular_exercise = ifelse(Q_PA_VD >= 3 | Q_PA_MD >= 5,1,0)
+#                              #exercise_per_time = Q_PA_DRT,
+#                              # exercise_freq_v = Q_PA_VD,
+#                              # exercise_freq_m = Q_PA_MD,
+#                              ) ],
+#                     by=c("INDI_DSCM_NO", "STD_YYYY"), all.x = T)
+# rm(g1eq)
 
 
 # Surgery Type
