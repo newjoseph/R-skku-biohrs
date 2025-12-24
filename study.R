@@ -753,8 +753,15 @@ gq_0208[, total_alcohol_consumption :=  ifelse(drink_freq == 1, 0, #거의 마�
                                                    ifelse(drink_freq == 4, 3.5, # 일주일에 3~4회 마신다 → 3.5일/주
                                                           ifelse(drink_freq == 5, 6.5, # 거의 매일 마신다 → 6.5일/주 
                                                                  0))))) # NA는 0으로 
-                              * ifelse(!is.na(alcohol_per_time), alcohol_per_time * 0.5 , 0)
-                              * 57.6 ] # 알코올 비중이 0.8 vs 0.785
+                              * ifelse(!is.na(alcohol_per_time), alcohol_per_time * 0.5, 0) 
+                              * 57.6 ] # 알코올 비중이 0.8로 (instead of 0.785)
+
+# ① 소주 반병 이하 → 0.5 병/회
+#	② 소주 한병 → 1.0 병/회
+# ③ 소주 1병반 → 1.5 병/회
+# ④ 소주 2병 이상 → 2.0 병/회 (상한이 없어서 “2.0”으로 최소치적용) 그래서 0.5 곱함.
+
+
 
 gq_0208[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
                              ifelse(total_alcohol_consumption < 105 , "Mild",
@@ -764,6 +771,9 @@ gq_0208[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
 gq_0208[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
 
 
+
+gq_0208[, smoker :=  ifelse(smoke == 3, "current smoker",
+                            ifelse(smoke == 2, "ex-smoker", "non-smoker"))]
 
 # ifelse(drink_freq == 1, 0, #거의 마시지 않는다 → 0일/주
 #        ifelse(drink_freq == 2, 0.625, #월 2~3회 정도 마신다 → 0.625일/주 
@@ -782,7 +792,6 @@ gq_0917 <- lapply(c(2009:2017), function(yr){
 }) %>% do.call(rbind, .) 
 
 
-gq_0917 %>% head
 gq_0917_origin <- copy(gq_0917)
 
 gq_0917 <- gq_0917[, .(INDI_DSCM_NO,
@@ -801,14 +810,9 @@ gq_0917 <- gq_0917[, .(INDI_DSCM_NO,
 ) ] %>% unique
 
 
-gq_0917[, total_alcohol_consumption :=  ifelse(drink_freq == 1, 0, #거의 마시지 않는다 → 0일/주
-                                               ifelse(drink_freq == 2, 0.625, #월 2~3회 정도 마신다 → 0.625일/주 
-                                                      ifelse(drink_freq == 3, 1.5, # 일주일에 1~2회 마신다 → 1.5일/주
-                                                             ifelse(drink_freq == 4, 3.5, # 일주일에 3~4회 마신다 → 3.5일/주
-                                                                    ifelse(drink_freq == 5, 6.5, # 거의 매일 마신다 → 6.5일/주 
-                                                                           0))))) # NA는 0으로 
-        * ifelse(!is.na(alcohol_per_time), alcohol_per_time * 0.5 , 0)
-        * 57.6 ] # 알코올 비중이 0.8 vs 0.785
+gq_0917[, total_alcohol_consumption :=  ifelse(!is.na(drink_freq), drink_freq, 0)
+        * ifelse(!is.na(alcohol_per_time), alcohol_per_time, 0)
+        * 8 ] # 알코올 섭취량 = (days per week) x (알코올 섭취 기준 잔) x 8g
 
 gq_0917[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
                                  ifelse(total_alcohol_consumption < 105 , "Mild",
@@ -816,6 +820,10 @@ gq_0917[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
                                                ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
 
 gq_0917[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+gq_0917[, smoker :=  ifelse(smoke == 3, "current smoker",
+                            ifelse(smoke == 2, "ex-smoker", "non-smoker"))]
 
 
 # 2018
@@ -908,11 +916,11 @@ container_volume = c(50,360,180,1,
            230,750,350,1,
            120,700,250,1)
 
-alcohol_vol_per_cc = c(17,17,12,17,
+alcohol_vol_per_cc = c(16,16,16,16,
                         4.5,4.5,4.5,4.5,
-                        40,40,7,40,
+                        40,40,40,40,
                         6,6,6,6,
-                        12,12,12,12)
+                       13.5,13.5,13.5,13.5)
 
 alcohol_type = c("Q_DRK_SOJU_SHOT", "Q_DRK_SOJU_BTL", "Q_DRK_SOJU_CAN", "Q_DRK_SOJU_CC",
                  "Q_DRK_BEER_SHOT", "Q_DRK_BEER_BTL", "Q_DRK_BEER_CAN", "Q_DRK_BEER_CC",
@@ -939,6 +947,11 @@ gq_rst_18[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
                                                ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
 
 gq_rst_18[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+
+gq_rst_18[, smoker :=  ifelse(smoke == 3, "current smoker",
+                            ifelse(smoke == 2, "ex-smoker", "non-smoker"))]
 
 
 gq_rst_1921 <- lapply(c(2019:2021), function(yr){
