@@ -532,10 +532,10 @@ options(scipen = 999)
 target_key <- readRDS("data/target_key.rds")
 
 
-t20_target <- t20[CMN_KEY %in% target_key]#[, Indexdate := min(MDCARE_STRT_DT), keyby="INDI_DSCM_NO"]
+t20_target <- t20[CMN_KEY %in% target_key][, Indexdate := min(MDCARE_STRT_DT), keyby="INDI_DSCM_NO"]
 t20_target_raw <- copy(t20_target)
-# write_fst(t20_target, "data/t20_target_raw.fst")
-t20_target <- read_fst("data/t20_target.fst", as.data.table = T)
+# write_fst(t20_target, "data/t20_target_raw_new.fst")
+t20_target <- read_fst("data/t20_target_raw_new.fst", as.data.table = T)
 
 ## exclusion criteria
 
@@ -543,8 +543,8 @@ attr = list("대수술 받은 사람:" = nrow(t20_target))
 
 #exclusion1: 대수술 받기 전에 dementia, Parkinson’s disease (G20), stroke (I60-64), cerebral hemorrhage (S06) 과거력이 5년내 있었던 환자 제외
 
-t20_excl_disease_whole <- t20[SICK_SYM1 %like% paste0(unlist(code.excl.disease), collapse="|")
-                              | SICK_SYM2 %like% paste0(unlist(code.excl.disease),collapse="|"),
+t20_excl_disease_whole <- t20[SICK_SYM1 %like% paste0("^",unlist(code.excl.disease), collapse="|")
+                              | SICK_SYM2 %like% paste0("^",unlist(code.excl.disease), collapse="|"),
                               .(INDI_DSCM_NO, Disease_date= MDCARE_STRT_DT)] #CMN_KEY
 # write_fst(t20_excl_disease_whole, "data/t20_excl_disease_whole.fst")
 # t20_excl_disease_whole <- read_fst("data/t20_excl_disease_whole.fst")
@@ -565,7 +565,7 @@ t20_past_5yr_disease_whole <- merge(t20_target, t20_excl_disease_whole, by="INDI
 excl_patients_id <- t20_past_5yr_disease_whole$INDI_DSCM_NO %>% unique
 # saveRDS(excl_patients_id, "data/excl_patients_id.rds")
 options(scipen = 999)
-# excl_patients_id <- readRDS("data/excl_patients_id.rds")
+excl_patients_id <- readRDS("data/excl_patients_id.rds")
 
 
 t20_target <- t20_target[!INDI_DSCM_NO %in% excl_patients_id,] %>% .[, Indexdate := MDCARE_STRT_DT]
@@ -611,31 +611,23 @@ code.cci <- list(
 cciscore <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 6, 6)
 names(cciscore) <- names(code.cci)
 
+
 cci_res <- mclapply(names(code.cci), function(x){
   
   
   ## past history
-  dt1 <- t20[SICK_SYM1 %like% paste0(code.cci[[x]], collapse = "|") | SICK_SYM2 %like% paste0(code.cci[[x]], collapse = "|"),] %>% 
-    .[, .(INDI_DSCM_NO, MDCARE_STRT_DT = MDCARE_STRT_DT, Incident_Date = MDCARE_STRT_DT)] %>% 
-    .[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")]
-    
-
-  # dt <- t20[SICK_SYM1 %like% paste0(code.cci[[x]], collapse = "|") | SICK_SYM2 %like% paste0(code.cci[[x]], collapse = "|"),][, .(INDI_DSCM_NO, MDCARE_STRT_DT = as.Date(as.character(MDCARE_STRT_DT), "%Y%m%d"), Incident_Date = as.Date(as.character(MDCARE_STRT_DT), "%Y%m%d"))]
-  # saveRDS(dt, "data/dt.rds")
-  # dt <- readRDS("data/dt.rds")
+  dt <- t20[SICK_SYM1 %like% paste0("^", code.cci[[x]], collapse = "|") | SICK_SYM2 %like% paste0("^", code.cci[[x]], collapse = "|"),] %>% 
+    .[, .(INDI_DSCM_NO, MDCARE_STRT_DT = MDCARE_STRT_DT, Incident_Date = MDCARE_STRT_DT)] 
   
-  
-  #t <- dt1[t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = 365*5]
-  ## CCI calculation: 전체 과거력 확인 
-  out1 <- dt1[t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
-    .[, cci_event := as.integer(!is.na(Incident_Date))  ] %>% 
+  out <- dt[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+    .[, cci_event := as.integer(!is.na(Incident_Date))] %>% 
     .[,cci_event] * cciscore[x]
   
-  return(out1)
+  return(out)
               
-}, mc.cores = 8) %>% do.call(cbind, .) %>% rowSums(.)
+}, mc.cores = 32) %>% do.call(cbind, .) %>% rowSums(.)
 
-saveRDS(cci_res, "data/cci_res.rds")
+# saveRDS(cci_res, "data/cci_res.rds")
 cci_res <- readRDS("data/cci_res.rds") 
 
 t20_target[, CCI := cci_res]
@@ -643,6 +635,11 @@ t20_target[,CCI_group := as.factor(ifelse(CCI==0,"0",
                                 ifelse(CCI==1, "1",
                                        ifelse(CCI==2, "2", ">= 3"))))]
 
+############# midpoint 1 ############# 
+
+
+# write_fst(t20_target, "data/t20_target(midpoint1).fst")
+t20_target <- read_fst("data/t20_target(midpoint1).fst", as.data.table = T)
 
 
 
@@ -664,7 +661,7 @@ rm(dth)
 t20_target[, FU_days := as.integer(pmin(as.Date(as.character(death_date), format="%Y%m%d"), as.Date("2013-12-31"), na.rm=T) - as.Date(Indexdate, format="%Y%m%d"))]
 
 
-## Age & Income 
+## Age & Income & SEX & disablity_type & 
 
 # bfc <- read_fst("/home/minhyuk.kim/knhis_data/BFC.fst", as.data.table = T)
 # bfc <- bfc[STD_YYYY %in% c(2002:2013)]
@@ -674,40 +671,52 @@ bfc <- read_fst("data/bfc.fst", as.data.table = T)
 t20_target[, INDI_DSCM_NO:= as.numeric(INDI_DSCM_NO)]
 
 
-t20_target <- merge(t20_target[, STD_YYYY:= substr(Indexdate, 1,4)], unique(bfc[, .(STD_YYYY, SEX = SEX_TYPE, BYEAR,  disablity_type = MAIN_DSB_TYPE,
+t20_target <- merge(t20_target[, STD_YYYY:= substr(Indexdate, 1,4)], unique(bfc[, .(STD_YYYY, SEX = SEX_TYPE, BYEAR, RVSN_ADDR_CD, disablity_type = MAIN_DSB_TYPE,
                                        insurance_quantile = CALC_CTRB_VTILE_FD), by=INDI_DSCM_NO]), by=c("INDI_DSCM_NO", "STD_YYYY"), all.x=T)  # insurance_fee = CALC_CTRB_FD, disablity_code := CMPR_DSB_GRADE
 rm(bfc)
 
 
 # 보험료 순위: 0~6, 7~13, 14~20
-t20_target[, income_tertile := ifelse(insurance_quantile %in% c(0:6), 1,
-                                  ifelse(insurance_quantile %in% c(7:13), 2, 3))]
+# t20_target[, income_tertile := ifelse(insurance_quantile %in% c(0:6), 1,
+#                                   ifelse(insurance_quantile %in% c(7:13), 2, 3))]
+
+t20_target[, income_binary := ifelse(insurance_quantile %in% 0, "Low", "High")]
 
 # Age
 t20_target[, Age := as.numeric(substr(Indexdate,1,4)) - as.numeric(substr(BYEAR,1,4))]
 t20_target <- t20_target[Age>=18, ]
 attr$`Exclusion2: Age >=18` = nrow(t20_target)
 
+t20_target[, AGE_group := fcase(
+  Age >= 18 & Age < 30, "18-29",
+  Age >= 30 & Age < 40, "30-39",
+  Age >= 40 & Age < 50, "40-49",
+  Age >= 50 & Age < 60, "50-59",
+  Age >= 60 & Age < 70, "60-69",
+  Age >= 70 & Age < 80, "70-79",
+  Age >= 80, ">= 80",
+  default = NA
+)]
 
-t20_target[, Age_group := ifelse(Age<65, "18-64", "65+")]
+t20_target[, Age_old := ifelse(Age<65, "18-64", "65+")]
 
 
-############# midpoint 1 ############# 
+############# midpoint 2 ############# 
 
 
-# write_fst(t20_target, "data/t20_target(midpoint1).fst")
-t20_target <- read_fst("data/t20_target(midpoint1).fst", as.data.table = T)
+# write_fst(t20_target, "data/t20_target(midpoint2).fst")
+t20_target <- read_fst("data/t20_target(midpoint2).fst", as.data.table = T)
 
 
 # ob_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2002.csv") %>% as.data.table()
-g1eq_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_2002.csv") %>% as.data.table()
-g1eq_09 <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_2009.csv") %>% as.data.table()
-
-gq_rst_19 <- read.csv("/home/minhyuk.kim/knhis_data/gq_rst_2019.csv") %>% as.data.table()
-
-
-g1eq <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_0217.csv") %>% as.data.table()
-g1eq <- g1eq[EXMD_BZ_YYYY %in% c(2002:2013), ]
+# g1eq_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_2002.csv") %>% as.data.table()
+# g1eq_09 <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_2009.csv") %>% as.data.table()
+# 
+# gq_rst_19 <- read.csv("/home/minhyuk.kim/knhis_data/gq_rst_2019.csv") %>% as.data.table()
+# 
+# 
+# g1eq <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_0217.csv") %>% as.data.table()
+# g1eq <- g1eq[EXMD_BZ_YYYY %in% c(2002:2013), ]
 
 
 gq_0208 <- lapply(c(2002:2008), function(yr){
@@ -1001,9 +1010,10 @@ gq_1921 <- merge(gq_1921,
             gq_rst_1921[,.(INDI_DSCM_NO, drink_freq, alcohol_per_time, smoke, regular_exercise, total_alcohol_consumption, alcohol_group, at_risk_drinking)],
             by = "INDI_DSCM_NO")
 
+gq_all <- rbind(gq_0208, gq_0917, gq_18, gq_1921)
 
-
-
+# write_fst(gq_all, "data/gq_all.fst")
+gq_all <- read_fst("data/gq_all.fst", as.data.table = T)
 
 
 # t20_target <- merge(t20_target, 
@@ -1021,30 +1031,77 @@ gq_1921 <- merge(gq_1921,
 #                     by=c("INDI_DSCM_NO", "STD_YYYY"), all.x = T)
 # rm(g1eq)
 
+t20_target <- read_fst("data/t20_target(midpoint1).fst", as.data.table = T)
+
+
+t <- merge(t20_target,
+           gq_all[, .(INDI_DSCM_NO,
+                      STD_YYYY = as.character(HC_BZ_YYYY),
+                      HC_DT,
+                      BMI,
+                      drink_freq,
+                      alcohol_per_time,
+                      smoke,
+                      regular_exercise,
+                      total_alcohol_consumption,
+                      alcohol_group,
+                      at_risk_drinking
+           ) ],
+           by=c("INDI_DSCM_NO", "STD_YYYY"))
+
+tt <- merge(t20_target,
+                    gq_all[, .(INDI_DSCM_NO,
+                               STD_YYYY = as.character(HC_BZ_YYYY),
+                               HC_DT,
+                               BMI,
+                               drink_freq,
+                               alcohol_per_time,
+                               smoke,
+                               regular_exercise,
+                               total_alcohol_consumption,
+                               alcohol_group,
+                               at_risk_drinking
+                    ) ],
+                    by=c("INDI_DSCM_NO", "STD_YYYY"), all.x = T)
+
+t20_target <- merge(t20_target,
+                    gq_all[, .(INDI_DSCM_NO,
+                             STD_YYYY = as.character(HC_BZ_YYYY),
+                             HC_DT,
+                             BMI,
+                             drink_freq,
+                             alcohol_per_time,
+                             smoke,
+                             regular_exercise,
+                             total_alcohol_consumption,
+                             alcohol_group,
+                             at_risk_drinking
+                             ) ],
+                    by=c("INDI_DSCM_NO", "STD_YYYY"), all.x = T)
+
 
 # Surgery Type
 t20_target[,CMN_KEY := bit64::as.integer64(CMN_KEY)]
 
 
+############# midpoint 2 ############# 
+
+
+# write_fst(t20_target, "data/t20_target(midpoint2).fst")
+t20_target <- read_fst("data/t20_target(midpoint2).fst", as.data.table = T)
 
 
 
-t20_target <- merge(t20_target, t30_all[, .(CMN_KEY, surgery_code = MCARE_DIV_CD_ADJ)], by="CMN_KEY", all.x=T)
+
+
+
+
+t20_target <- merge(t20_target, t30_all[, .(CMN_KEY, surgery_code = MCARE_DIV_CD_ADJ)], by="CMN_KEY", all.x=T) # size 증가 
 t20_target[, surgery_type := code.surgery.named[substr(surgery_code,1,5)]]
 
 
 
 
-
-# Sex
-# BMI
-# income
-# education
-# CCI
-# disability type 
-# Alcohol 
-# Regular exercise 
-# Smoking 
 
 ############# outcome variables  ############# 
 
@@ -1062,22 +1119,34 @@ t20 <- read_fst("study/data/t20.fst", as.data.table = T)
 t20_dep_whole <- t20[ SICK_SYM1 %like% unlist(code.dep) | SICK_SYM2 %like% unlist(code.dep), ]
 
 # write_fst(t20[ SICK_SYM1 %like% unlist(code.dep) | SICK_SYM2 %like% unlist(code.dep), ], "data/t20_dep_whole.fst")
+
 t20_dep_whole <- read_fst("data/t20_dep_whole.fst", as.data.table = T)
-tt <- t20_dep_whole[, .(dep_CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO = as.integer(INDI_DSCM_NO), depression_date = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))]
+t20_dep <- t20_dep_whole[, .(dep_CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO = as.integer(INDI_DSCM_NO), depression_date = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))]
 t20_target[ , Indexdate := as.Date(as.character(Indexdate), format="%Y%m%d")]
 
 target <- copy(t20_target)
 
-out <- merge(target, tt, by="INDI_DSCM_NO")
+# out1 <- merge(target, t20_dep, by="INDI_DSCM_NO")
+# t <- merge(target, t20_dep, by="INDI_DSCM_NO")
+# tt <- merge(target, t20_dep, by="INDI_DSCM_NO")[Indexdate < depression_date,]
+# tt2 <- merge(target, t20_dep, by="INDI_DSCM_NO") %>% .[Indexdate < depression_date,]
+# ttt <- merge(target, t20_dep, by="INDI_DSCM_NO")[, .(Indexdate, depression_date)][Indexdate < depression_date,]
+# tttt <- merge(target, t20_dep, by="INDI_DSCM_NO")[Indexdate < depression_date,][difftime(depression_date, Indexdate, unit="days") <= 30]
+# out2 <- out1[, .(Indexdate, depression_date)][Indexdate < depression_date,][difftime(depression_date, Indexdate, unit="days") <= 30]
 
-out[, .(Indexdate, depression_date)][Indexdate < depression_date,][difftime(depression_date, Indexdate, unit="days") <30]
+
+t20_target <- merge(t20_target, t20_dep, by="INDI_DSCM_NO") %>% 
+  .[Indexdate < depression_date,] %>%
+  .[difftime(depression_date, Indexdate, unit="days") <= 30]
+
+
+
 
 
 out[, .(Indexdate, month_1 = Indexdate+months(1), year_1 = Indexdate+months(12))] %>% head
-out <- merge(target, tt, by="INDI_DSCM_NO")[Indexdate < depression_date,] %>% 
+out <- merge(target, t20_dep, by="INDI_DSCM_NO")[Indexdate < depression_date,] %>% 
       .[Indexdate + month(1)]
 
-# tt[target, ]
 
 # Dementia
 
