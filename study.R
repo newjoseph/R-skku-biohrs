@@ -899,7 +899,7 @@ gle_per_alcohol <- function(x){
     }else if(x==2){ # 한달 = 4주
       return(0.25)
     }else if(x==3){
-      return(0.02) # 일년 = 약 50주 
+      return(0.01923) # 일년 = 52주 
     }else{
       return(0)
     }
@@ -966,6 +966,7 @@ gq_rst_1921 <- gq_rst_1921[, .(INDI_DSCM_NO,
                  HC_BZ_YYYY,
                  HC_DT,
                  smoke = Q_SMK_YN,
+                 Q_SMK_STP_DRT,
                  Q_DRK_PER, Q_DRK_FRQ,
                  Q_DRK_SOJU_SHOT, Q_DRK_SOJU_BTL, Q_DRK_SOJU_CAN, Q_DRK_SOJU_CC,
                  Q_DRK_BEER_SHOT, Q_DRK_BEER_BTL, Q_DRK_BEER_CAN, Q_DRK_BEER_CC,
@@ -1007,6 +1008,10 @@ gq_rst_1921[, alcohol_group:= ifelse(total_alcohol_consumption == 0, "None",
                                                ifelse(total_alcohol_consumption >= 210, "Heavy", "NA"))))]
 
 gq_rst_1921[, at_risk_drinking := ifelse(alcohol_group %in% c("Moderate", "Heavy"), 1,0)]
+
+
+
+gq_rst_1921[, smoker :=  ifelse(smoke == 2, ifelse(Q_SMK_STP_DRT >  1, "ex-smoker", "current smoker"), "non-smoker")]
 
 
 
