@@ -1250,5 +1250,33 @@ t20_target <- merge(t20_target, cohort.AF, by="INDI_DSCM_NO", all.x=T)
 
 
 # Readmission outcome
-# Length of stay outcome
+
+
+t20_readmission_whole <- t20[!SICK_SYM1 %like% paste0("^", c(code.chemotherapy, code.radiotherapy) , collapse = "|"),
+                       .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), SICK_SYM1, date_readmission = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))]
+setkey(t20_readmission_whole, INDI_DSCM_NO, date_readmission)
+
+
+# write_fst(t20_readmission_whole, "data/t20_readmission_whole.fst")
+# t20_readmission_whole <- read_fst("data/t20_readmission_whole.fst", as.data.table = T)
+
+aa <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], roll= -30, on=c("INDI_DSCM_NO", "SICK_SYM1", "date_readmission" = "Indexdate")]
+aa[order(INDI_DSCM_NO, date_readmission)]
+aa2 <- aa[, .SD[1], by="INDI_DSCM_NO"]
+
+t20_readmission <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, SICK_SYM1, Indexdate)], roll= -30, on=c("INDI_DSCM_NO", "SICK_SYM1", "date_readmission" = "Indexdate")] %>% 
+                        .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO" ]
+
+cohort.readmission <- merge(t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], t20_readmission, by=c("INDI_DSCM_NO", "SICK_SYM1")) %>% 
+                    .[date_readmission - Indexdate <=30,] %>% 
+                    .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO"]
+
+
+t20_target[, readmission := ifelse(INDI_DSCM_NO %in% cohort.readmission, 1, 0) ]
+
+t20_target <- merge(t20_target, cohort.readmission, by = "INDI_DSCM_NO", all.x = T)
+
+# Length of stay outcome => VSHSP_DD_CNT
+t20_target[ , length_of_stay := as.numeric(VSHSP_DD_CNT)]
+t20_target[ , VSHSP_DD_CNT := NULL]
 
