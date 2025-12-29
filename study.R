@@ -1253,7 +1253,12 @@ t20_target <- merge(t20_target, cohort.AF, by="INDI_DSCM_NO", all.x=T)
 
 
 t20_readmission_whole <- t20[!SICK_SYM1 %like% paste0("^", c(code.chemotherapy, code.radiotherapy) , collapse = "|"),
-                       .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), SICK_SYM1, date_readmission = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))]
+                       .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), SICK_SYM1, 
+                         date_readmission = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"), MDCARE_SYM, FORM_CD)] %>% 
+                        .[FORM_CD %in% c(2, 7, 10), ] # 2: 의과 입원, 7: 보건기관 입원, 10: 정신과 입원
+
+
+
 setkey(t20_readmission_whole, INDI_DSCM_NO, date_readmission)
 
 
@@ -1268,7 +1273,7 @@ t20_readmission <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, SICK_SYM1,
                         .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO" ]
 
 cohort.readmission <- merge(t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], t20_readmission, by=c("INDI_DSCM_NO", "SICK_SYM1")) %>% 
-                    .[date_readmission - Indexdate <=30,] %>% 
+                    .[date_readmission - Indexdate <=30 & date_readmission - Indexdate <=365,] %>% 
                     .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO"]
 
 
@@ -1279,4 +1284,57 @@ t20_target <- merge(t20_target, cohort.readmission, by = "INDI_DSCM_NO", all.x =
 # Length of stay outcome => VSHSP_DD_CNT
 t20_target[ , length_of_stay := as.numeric(VSHSP_DD_CNT)]
 t20_target[ , VSHSP_DD_CNT := NULL]
+
+
+# opioid consumption 
+
+code.opiode.base
+
+t60_opiode <- t60[MCARE_DIV_CD_ADJ %in% unlist(code.opiode.base), ]
+#write_fst(t60_opiode, "data/t60_opiode.fst")
+t60_opiode <- read_fst("data/t60_opiode.fst", as.data.table = T)
+
+t30_opiode <- t30[MCARE_DIV_CD_ADJ %in% unlist(code.opiode.base), ]
+# write_fst(t30_opiode, "data/t30_opiode.fst")
+t30_opiode <- read_fst("data/t30_opiode.fst", as.data.table = T)
+
+t30_60_opiode <- rbind(t30_opiode[, .(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)] ,  t60_opiode[,.(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)])
+# write_fst(t30_60_opiode, "data/t30_60_opiode.fst")
+t30_60_opiode <- read_fst("data/t30_60_opiode.fst", as.data.table = T)
+
+opiode.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_opiode = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t30_60_opiode, by="CMN_KEY")
+opiode.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
+opiode.whole[, date_opiode := as.Date(as.character(date_opiode), format = "%Y%m%d")]
+# write_fst(opiode.whole, "data/opiode.whole.fst")
+opiode.whole <- read_fst("data/opiode.whole.fst", as.data.table = T)
+setkey(opiode.whole, INDI_DSCM_NO,  date_opiode, TOT_PRSC_DD_CNT)
+
+
+## duration setting required
+
+cohort.opiode <- merge(t20_target, opiode.whole[, .(INDI_DSCM_NO, date_opiode, TOT_PRSC_DD_CNT, TOT_MCNT)], by="INDI_DSCM_NO") %>% 
+    .[date_opiode - Indexdate >= 365 & date_opiode - Indexdate <= 365.25 * 5, ]
+
+
+
+cohort.opiode <- merge(t20_target, opiode.whole[], by="INDI_DSCM_NO")
+
+
+t60_test <- t60[MCARE_DIV_CD_ADJ == "655901790", .(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)]
+
+test.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_test = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t60_test, by="CMN_KEY")
+test.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
+test.whole[, date_test := as.Date(as.character(date_test), format = "%Y%m%d")]
+setkey(test.whole, INDI_DSCM_NO,  date_test, TOT_PRSC_DD_CNT)
+
+
+cohort.test <- merge(t20_target, test.whole[, .(INDI_DSCM_NO, date_test, test_drug_presc = as.numeric(TOT_PRSC_DD_CNT), TOT_MCNT)], by="INDI_DSCM_NO") %>% 
+  .[date_test - Indexdate >= 365 & date_test - Indexdate <= 365.25 * 5, ]
+
+
+drug_calc_dt <- copy(cohort.test)
+drug_calc_dt[, end_date := date_test + test_drug_presc - 1]
+setorder(drug_calc_dt, INDI_DSCM_NO, date_test)
+
+drug_calc_dt[, max_prev_end := shift(cummax(as.integer(end_date)), fill = -Inf), by = INDI_DSCM_NO]
 
