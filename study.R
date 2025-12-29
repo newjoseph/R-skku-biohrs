@@ -125,6 +125,30 @@ code.alzheimer = c("F00", "G30")
 code.mental.disease <- paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69,70:79,80:89,90:98,99),c(32:34)))
 
 
+code.covariate <- list(
+  Hypertension = paste0("I", 10:13),
+  Dyslipidemia = "E78",
+  Diabetes = paste0("E", 10:14),
+  Angina_pectoris = "I20",
+  Recent_MI = c("I21", "I22", "I252"),
+  Previous_PCI = c("M6551", "M6552", "M6553", "M6554",
+                   "M6561", "M6562", "M6563", "M6564",
+                   "M6565", "M6566", "M6567",
+                   "M6571", "M6572"), 
+  CHF = c("I099", "I110", "I130", "I132", "I255",
+          "I420", paste0("I42", 5:9), "I43", "I50", "P290"),
+  Atrial_fibrillation = c("I48", paste0("I48", 0:4), "I489"),
+  Conduction_abnormality = paste0("I4", 4:5),
+  Cerebrovascular_disease = c("G45", "G46", "H340", paste0("I", 60:69)),
+  Extracardiac_arteriopathy = c("I652", "I700", "I702", "I739", paste0("I74", 1:5)),
+  Chronic_pulmonary_disease = c("I278", "I279", paste0("J", c(40:47, 60:67, 684, 701, 703))),
+  Renal_disease = c("I120", "I131", "N032", "N033", "N034", "N035", "N036", "N037",
+                    "N052", "N053", "N054", "N055", "N056", "N057", "N18", "N19",
+                    "N250", "Z490", "Z491", "Z492", "Z940", "Z992")
+)
+
+
+
 # PDT, PCA code - include
 code.PDT <- c("K4410027", "K4410127", "K4411023", "K4411123", "K4411223", "BI0701OQ", "O1301")
 code.PCA <- c("LA201", "LA202", "LA203", "LA204", "LA205", "LA206")
@@ -611,6 +635,8 @@ code.cci <- list(
   # B20-B24 전체 포함
   AIDS_HIV = paste0("B", c(20:24))
 )
+
+
 cciscore <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 6, 6)
 names(cciscore) <- names(code.cci)
 
@@ -623,12 +649,27 @@ cci_res <- mclapply(names(code.cci), function(x){
     .[, .(INDI_DSCM_NO, MDCARE_STRT_DT = MDCARE_STRT_DT, Incident_Date = MDCARE_STRT_DT)] 
   
   out <- dt[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
-    .[, cci_event := as.integer(!is.na(Incident_Date))] %>% 
+    .[, .(cci_event = as.integer(!is.na(Incident_Date)))] %>% 
     .[,cci_event] * cciscore[x]
   
   return(out)
               
-}, mc.cores = 32) %>% do.call(cbind, .) %>% rowSums(.)
+}, mc.cores = 32)  %>% do.call(cbind, .) %>% rowSums(.)
+
+# names(cci_result) <-  names(code.cci)
+# 
+# cci_res <- lapply(names(cci_result), function(x){
+#   cci_result[[x]]$cci_event * cciscore[x]
+#   
+# })  %>% do.call(cbind, .) %>% rowSums(.)
+# 
+# 
+# names(cci_result) <-  names(code.cci)
+# 
+# cci_diseases <- lapply(names(cci_result), function(x){
+#   cci_result[[x]][,2]
+#   
+# })  %>% do.call(cbind, .)
 
 # saveRDS(cci_res, "data/cci_res.rds")
 cci_res <- readRDS("data/cci_res.rds") 
@@ -1034,7 +1075,7 @@ gq_1921 <- merge(gq_1921,
             by = "INDI_DSCM_NO")
 
 gq_all <- rbind(gq_0208, gq_0917, gq_18, gq_1921)
-
+gq_all[ , heavy_drinker := ifelse(alcohol_group == "Heavy", 1, 0)]
 # write_fst(gq_all, "data/gq_all.fst")
 gq_all <- read_fst("data/gq_all.fst", as.data.table = T)
 
@@ -1275,7 +1316,7 @@ cohort.AF <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_AF[, .(INDI_DS
   .[order(INDI_DSCM_NO, date_AF), .SD[1], by="INDI_DSCM_NO"]
 
 
-t20_target[, AF := ifelse(INDI_DSCM_NO %in% cohort.AF$INDI_DSCM_NO, 1, 0)]
+t20_target[, new_onset_AF := ifelse(INDI_DSCM_NO %in% cohort.AF$INDI_DSCM_NO, 1, 0)]
 t20_target <- merge(t20_target, cohort.AF, by="INDI_DSCM_NO", all.x=T)
 
 
@@ -1361,6 +1402,48 @@ cohort.opiode <- block.opiode[continuous_days >=28, ]
 
 
 t20_target <- t20_target[, opiode := ifelse(INDI_DSCM_NO %in% cohort.opiode$INDI_DSCM_NO, 1, 0)]
+
+
+
+
+varlist <- list(
+  Base = c("Age", "Age_group", "Sex", "BMI", "smoker", "heavy_drinker", "regular_exercise", "residence", "income_binary", names(code.covariate) ,"CCI_group", "dementia"),
+  Outcome = c("Injury_mechanism", "Injury_location", "new_onset_AF", "Injury_type_simple", "Death", "Hosp_or_Death", "EM_Result_cat")
+)
+
+  
+
+out <- a[, .SD, .SDcols = c(unlist(varlist))]
+
+factor_vars <- c(names(out)[sapply(out, function(x){length(table(x))}) <= 6])
+out[, (factor_vars) := lapply(.SD, factor), .SDcols = factor_vars]
+conti_vars <- setdiff(names(out), c(factor_vars))
+out[, (conti_vars) := lapply(.SD, as.numeric), .SDcols = conti_vars]
+
+out.label <- jstable::mk.lev(out)
+
+vars01 <- sapply(factor_vars, function(v){
+  identical(levels(out[[v]]), c("0", "1"))})
+for (v in names(vars01)[vars01 == T]){
+  out.label[variable == v, val_label := c("No", "Yes")]
+}
+
+out.label[variable == "Injury_type_simple", val_label := c("Others", "Fracture/Dislocation & Sprain")]
+out.label[variable == "Age_group", val_label := c("6-10", "11-18")]
+out.label[variable == "EMS", val_label := c("Non-EMS", "EMS")]
+#out.label[variable == "Death", val_label := c("Survival", "Death")]
+out.label[variable == "Death", val_label := c("Survival")]
+out.label[variable == "Hosp_or_Death", val_label := c("Others", "Hospitalization or Death")]
+
+
+
+
+tb <- createWorkbook("tb")
+addWorksheet(tb, "flow chart")
+writeDataTable(tb, "flow chart",as.data.frame(attr, row.names = rownames(attr)), rowNames = T)
+
+saveWorkbook(tb, "data/data_out/flow_chart_inclusion_exclusion.xlsx", overwrite = T)
+
 
 
 
