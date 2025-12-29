@@ -1302,39 +1302,71 @@ t30_60_opiode <- rbind(t30_opiode[, .(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)] ,  t
 # write_fst(t30_60_opiode, "data/t30_60_opiode.fst")
 t30_60_opiode <- read_fst("data/t30_60_opiode.fst", as.data.table = T)
 
-opiode.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_opiode = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t30_60_opiode, by="CMN_KEY")
+opiode.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_opiode = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t30_60_opiode, by="CMN_KEY") %>% 
+  .[, .(INDI_DSCM_NO, date_opiode, TOT_PRSC_DD_CNT)] %>% unique
 opiode.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
 opiode.whole[, date_opiode := as.Date(as.character(date_opiode), format = "%Y%m%d")]
-# write_fst(opiode.whole, "data/opiode.whole.fst")
-opiode.whole <- read_fst("data/opiode.whole.fst", as.data.table = T)
+# write_fst(opiode.whole, "data/opiode_whole.fst")
+opiode.whole <- read_fst("data/opiode_whole.fst", as.data.table = T)
 setkey(opiode.whole, INDI_DSCM_NO,  date_opiode, TOT_PRSC_DD_CNT)
 
+presc_opiode <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], opiode.whole[, .(INDI_DSCM_NO, date_opiode, duration = as.numeric(TOT_PRSC_DD_CNT))], by="INDI_DSCM_NO") %>% 
+  .[date_opiode - Indexdate >= 365 & date_opiode - Indexdate <= 365.25 * 5, ]
 
-## duration setting required
-
-cohort.opiode <- merge(t20_target, opiode.whole[, .(INDI_DSCM_NO, date_opiode, TOT_PRSC_DD_CNT, TOT_MCNT)], by="INDI_DSCM_NO") %>% 
-    .[date_opiode - Indexdate >= 365 & date_opiode - Indexdate <= 365.25 * 5, ]
-
-
-
-cohort.opiode <- merge(t20_target, opiode.whole[], by="INDI_DSCM_NO")
+opiode_dt <- copy(presc_opiode)
+opiode_dt[, end_date := date_opiode + duration -1 ]
+setorder(opiode_dt, INDI_DSCM_NO, date_opiode)
 
 
-t60_test <- t60[MCARE_DIV_CD_ADJ == "655901790", .(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)]
-
-test.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_test = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t60_test, by="CMN_KEY")
-test.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
-test.whole[, date_test := as.Date(as.character(date_test), format = "%Y%m%d")]
-setkey(test.whole, INDI_DSCM_NO,  date_test, TOT_PRSC_DD_CNT)
+opiode_dt[, max_prev_end := shift(cummax(as.numeric(end_date)), n=1, type= "lag", fill = -Inf),  by ="INDI_DSCM_NO"]
+# opiode_dt[, max_prev_end2 := as.Date(max_prev_end)]
+opiode_dt[, is_new_block := as.numeric(date_opiode) > (max_prev_end + 1)]
+opiode_dt[, block_id := cumsum(is_new_block), by = INDI_DSCM_NO]
 
 
-cohort.test <- merge(t20_target, test.whole[, .(INDI_DSCM_NO, date_test, test_drug_presc = as.numeric(TOT_PRSC_DD_CNT), TOT_MCNT)], by="INDI_DSCM_NO") %>% 
-  .[date_test - Indexdate >= 365 & date_test - Indexdate <= 365.25 * 5, ]
+block.opiode <- opiode_dt[, .(start_date = min(date_opiode), end_date = max(end_date)), by = c("INDI_DSCM_NO","block_id")]
+block.opiode[, continuous_days := as.numeric(end_date - start_date + 1)]   
+
+cohort.opiode <- block.opiode[continuous_days >=28, ]
 
 
-drug_calc_dt <- copy(cohort.test)
-drug_calc_dt[, end_date := date_test + test_drug_presc - 1]
-setorder(drug_calc_dt, INDI_DSCM_NO, date_test)
+t20_target <- t20_target[, opiode := ifelse(INDI_DSCM_NO %in% cohort.opiode$INDI_DSCM_NO, 1, 0)]
 
-drug_calc_dt[, max_prev_end := shift(cummax(as.integer(end_date)), fill = -Inf), by = INDI_DSCM_NO]
 
+
+# t60_test <- t60[MCARE_DIV_CD_ADJ == "642102570", .(CMN_KEY, MCARE_DIV_CD_ADJ, TOT_MCNT)]
+# # write_fst(t60_test, "data/t60_test.fst")
+# t60_test <- read_fst("data/t60_test.fst", as.data.table = T)
+# 
+# # 같은날 같은 기간 여러 약물을 처방받은 경우는 unique하게 
+# 
+# test.whole <- merge(t20[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, date_test = MDCARE_STRT_DT, TOT_PRSC_DD_CNT)], t60_test, by="CMN_KEY") %>% 
+#   .[, .(INDI_DSCM_NO, date_test, TOT_PRSC_DD_CNT)] %>% unique
+# 
+# # write_fst(test.whole, "data/test_whole.fst")
+# test.whole <- read_fst("data/test_whole.fst", as.data.table = T)
+# 
+# 
+# test.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
+# test.whole[, date_test := as.Date(as.character(date_test), format = "%Y%m%d")]
+# test.whole[, TOT_PRSC_DD_CNT := as.numeric(TOT_PRSC_DD_CNT)]
+# setkey(test.whole, INDI_DSCM_NO,  date_test, TOT_PRSC_DD_CNT)
+# 
+# 
+# cohort.test <- merge(t20_target, test.whole[, .(INDI_DSCM_NO, date_test, duration = as.numeric(TOT_PRSC_DD_CNT))], by="INDI_DSCM_NO") %>% 
+#   .[date_test - Indexdate >= 365 & date_test - Indexdate <= 365.25 * 5, ]
+# 
+# 
+# drug_calc_dt <- copy(cohort.test)
+# drug_calc_dt[, end_date := date_test + duration - 1]
+# setorder(drug_calc_dt, INDI_DSCM_NO, date_test)
+# 
+# drug_calc_dt <- drug_calc_dt[, . (INDI_DSCM_NO, date_test, duration, end_date)]
+# 
+# drug_calc_dt[, max_prev_end := shift(cummax(as.numeric(end_date)), n=1, type="lag", fill = -Inf), by = INDI_DSCM_NO]
+# drug_calc_dt[, is_new_block := as.numeric(date_test) > (max_prev_end + 1)]
+# drug_calc_dt[, block_id := cumsum(is_new_block), by = INDI_DSCM_NO]
+# 
+# test.block <- drug_calc_dt[, .(start_date = min(date_test), end_date = max(end_date)), by = c("INDI_DSCM_NO", "block_id")]
+# test.block[, continuous_days := as.numeric(end_date - start_date + 1)]   
+# cohort.test <- test.block[continuous_days >= 28, unique(INDI_DSCM_NO)]   
