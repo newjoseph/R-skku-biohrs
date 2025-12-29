@@ -1080,22 +1080,22 @@ t20_target[,CMN_KEY := bit64::as.integer64(CMN_KEY)]
 ############# midpoint 3 ############# 
 
 # write_fst(t20_target, "data/t20_target(midpoint3).fst")
-t20_target <- read_fst("data/t20_target(midpoint3).fst", as.data.table = T) # 수정이 필요 
+# t20_target <- read_fst("data/t20_target(midpoint3).fst", as.data.table = T) # 수정이 필요 
 
 
 
 t20_target <- read_fst("data/t20_target(midpoint2).fst", as.data.table = T)
 
 
-tt <- merge(t20_target, t30_all[, .(CMN_KEY, surgery_code = MCARE_DIV_CD_ADJ)], by="CMN_KEY", all.x=T)
-
-ttttt <- merge(t20_target, unique(t30_all[, .(CMN_KEY, surgery_type = code.surgery.named[substr(MCARE_DIV_CD_ADJ,1,5)])]), by="CMN_KEY")
+# tt <- merge(t20_target, t30_all[, .(CMN_KEY, surgery_code = MCARE_DIV_CD_ADJ)], by="CMN_KEY", all.x=T)
+# 
+# ttttt <- merge(t20_target, unique(t30_all[, .(CMN_KEY, surgery_type = code.surgery.named[substr(MCARE_DIV_CD_ADJ,1,5)])]), by="CMN_KEY")
 
 
 
 t20_target_2 <- merge(t20_target, t30_all[, .(CMN_KEY, surgery_code = MCARE_DIV_CD_ADJ)], by="CMN_KEY", all.x=T) # size 증가 
 
-# Surgery Type
+# Surgery Type - 데이터센터에서 직접 가서 해보고 확인한다. 
 t20_target[, surgery_type := code.surgery.named[substr(surgery_code,1,5)]]
 
 
@@ -1113,34 +1113,6 @@ t20_target[, surgery_type := code.surgery.named[substr(surgery_code,1,5)]]
 # opioid consumption 
 
 
-
-# Dementia
-
-
-options(scipen = 999)
-#write_fst(t20[ SICK_SYM1 %like% paste0("^", code.dementia, collapse="|") | SICK_SYM2 %like% paste0("^", code.dementia, collapse="|"), ], "data/t20_dementia_whole.fst")
-t20_dementia_whole <- read_fst("data/t20_dementia_whole.fst", as.data.table = T)
-
-
-t60 <- read_fst("/home/minhyuk.kim/knhis_data/T60.fst", as.data.table = T)
-#write_fst(t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug.base), ], "data/t60_dementia.fst")
-t60_dementia <- read_fst("data/t60_dementia.fst", as.data.table = T)
-
-t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
-# write_fst(t30[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug.base), ], "data/t30_dementia.fst")
-t30_dementia <- read_fst("data/t30_dementia.fst", as.data.table = T)
-
-t30_60_dementia <- rbind(t30_dementia[, .(CMN_KEY, MCARE_DIV_CD_ADJ)] ,  t60_dementia[,.(CMN_KEY, MCARE_DIV_CD_ADJ)])
-# write_fst(t30_60_dementia, "data/t30_60_dementia.fst")
-t30_60_dementia <- read_fst("data/t30_60_dementia.fst", as.data.table = T)
-
-dementia_whole <- merge(t20_dementia_whole[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, dementia_code1 = SICK_SYM1, dementia_code2 = SICK_SYM2)], 
-                        t30_60_dementia[, .(CMN_KEY, dimentia_drug = MCARE_DIV_CD_ADJ )], by="CMN_KEY", all.x = T) %>% 
-  .[!is.na(dimentia_drug) , N := .N, by=c("INDI_DSCM_NO", "dimentia_drug")]
-
-
-dementia_whole[!is.na(dimentia_drug) , N := .N, by=c("INDI_DSCM_NO", "dimentia_drug")]
-dementia_with_prescription <- dementia_whole[N >= 2,]
 
 
 
@@ -1190,6 +1162,64 @@ cohort.depression <- merge(t20_target, t20_dep, by="INDI_DSCM_NO") %>%
 
 t20_target[, Depression := ifelse(INDI_DSCM_NO %in% cohort.depression$INDI_DSCM_NO, 1, 0)]
 t20_target <- merge(t20_target, cohort.depression, by="INDI_DSCM_NO", all.x = T)
+
+
+
+
+# Dementia
+
+options(scipen = 999)
+#write_fst(t20[ SICK_SYM1 %like% paste0("^", code.dementia, collapse="|") | SICK_SYM2 %like% paste0("^", code.dementia, collapse="|"), ], "data/t20_dementia_whole.fst")
+t20_dementia_whole <- read_fst("data/t20_dementia_whole.fst", as.data.table = T)
+
+
+t60 <- read_fst("/home/minhyuk.kim/knhis_data/T60.fst", as.data.table = T)
+#write_fst(t60[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug.base), ], "data/t60_dementia.fst")
+t60_dementia <- read_fst("data/t60_dementia.fst", as.data.table = T)
+
+t30 <- read_fst("/home/minhyuk.kim/knhis_data/T30.fst", as.data.table = T)
+# write_fst(t30[MCARE_DIV_CD_ADJ %in% unlist(code.dementia.drug.base), ], "data/t30_dementia.fst")
+t30_dementia <- read_fst("data/t30_dementia.fst", as.data.table = T)
+
+t30_60_dementia <- rbind(t30_dementia[, .(CMN_KEY, MCARE_DIV_CD_ADJ)] ,  t60_dementia[,.(CMN_KEY, MCARE_DIV_CD_ADJ)])
+# write_fst(t30_60_dementia, "data/t30_60_dementia.fst")
+t30_60_dementia <- read_fst("data/t30_60_dementia.fst", as.data.table = T)
+
+
+dementia_presc <- merge(t20_dementia_whole[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO,  date_dementia = MDCARE_STRT_DT, dementia_code1 = SICK_SYM1, dementia_code2 = SICK_SYM2)],
+                         t30_60_dementia[, .(CMN_KEY, dimentia_drug = MCARE_DIV_CD_ADJ )], by="CMN_KEY") %>% 
+  .[, N := .N, by=c("INDI_DSCM_NO", "dimentia_drug")] %>% 
+  .[N >= 2,]
+
+## my approach
+# dementia_whole <- merge(t20_dementia_whole[, .(CMN_KEY = bit64::as.integer64(CMN_KEY), INDI_DSCM_NO, dementia_code1 = SICK_SYM1, dementia_code2 = SICK_SYM2)],
+#                         t30_60_dementia[, .(CMN_KEY, dimentia_drug = MCARE_DIV_CD_ADJ )], by="CMN_KEY", all.x = T) %>%
+#   .[!is.na(dimentia_drug) , N := .N, by=c("INDI_DSCM_NO", "dimentia_drug")]
+# 
+# 
+# dementia_whole[!is.na(dimentia_drug) , N := .N, by=c("INDI_DSCM_NO", "dimentia_drug")]
+# dementia_with_prescription <- dementia_whole[N >= 2,]
+
+
+t20.alzh <- t20[SICK_SYM1 %like% paste0("^", code.alzheimer, collapse = "|") | SICK_SYM2 %like% paste0("^", code.alzheimer, collapse = "|"), ]
+# write_fst(t20.alzh, "data/t20_alzh.fst")
+t20.alzh <- read_fst("data/t20_alzh.fst", as.data.table = T)
+
+# depp <- merge(t20_target, t20.alzh[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_alz = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))] , by="INDI_DSCM_NO", all.x = T)
+cohort.alzh <- merge(t20_target, t20.alzh[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_alz = as.Date(as.character(MDCARE_STRT_DT), format="%Y%m%d"))] , by="INDI_DSCM_NO", all.x = T) %>% 
+  .[date_alz - depression_date <=  365 & date_alz >= depression_date, ]
+
+
+# write_fst(cohort.alzh, "data/cohort_alzh.fst")
+cohort.alzh <- read_fst("data/cohort_alzh.fst", as.data.table = T)
+
+
+cohort.dementia <- dementia_presc[!cohort.alzh[ ,.(INDI_DSCM_NO)], on= "INDI_DSCM_NO"]
+
+
+t20_target[, dementia := ifelse(INDI_DSCM_NO %in% cohort.dementia$INDI_DSCM_NO, 1, 0)]
+
+t20_target <- merge(t20_target, cohort.dementia[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_dementia)], by = "INDI_DSCM_NO", all.x = T)
 
 
 
