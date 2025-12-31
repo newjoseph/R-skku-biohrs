@@ -126,7 +126,7 @@ code.mental.disease <- paste0("F", setdiff(c(10:19,20:29,30:39,40:48,50:59,60:69
 
 
 code.covariate <- list(
-  Hypertension = paste0("I", 10:13),
+  Hypertension = paste0("I", c(10:13,15)),
   Dyslipidemia = "E78",
   Diabetes = paste0("E", 10:14),
   Angina_pectoris = "I20",
@@ -147,6 +147,27 @@ code.covariate <- list(
                     "N250", "Z490", "Z491", "Z492", "Z940", "Z992")
 )
 
+# HTN
+code.hypertension <- c("I10","I11","I12","I13", "I15")
+
+# Diabetes
+code.diabetes <- c(paste0("E", 10:14))
+
+# Dyslipidemia
+code.dyslipidemia <- c("E78")
+
+# Cerebrovascular disease
+
+code.cerebrovascular <- c("G45", "G46", "H340", paste0("I", 60:69))
+
+
+# kidney disease
+code.kidney <- c("N17", "E102", "E1128", "E1228", "N18") # Acute kidney injury + Chronic kidney disease
+
+
+# stroke 
+
+code.stroke <- c(paste0("I", 60:64))
 
 
 # PDT, PCA code - include
@@ -459,12 +480,15 @@ code.opiode.drug.named <- with(
 code.cardiovascular <- list(
   acute.myocardial.infarction = c("I21", "I22", "I23", "I24"),
   angina.pectoris = c("I20"),
-  congestive.heart.failure =  c("I09.9", "I11.0", "I13.2", "I25.5", "I42", "I42.0", "I42.5", "I42.6", "I42.7", "I42.8", "I42.9", "I43", "I43.0", "I43.1", "I43.2", "I43.8", "I43.9", "I50", "I50.0", "I50.1", "I50.9", "P29.0")
+  congestive.heart.failure =  c("I099", "I110", "I132", "I255", "I42", "I420", "I425", "I426", "I427", "I428", "I429", "I43", "I430", "I431", "I432", "I438", "I439", "I50", "I500", "I501", "I509", "P290")
 )
 
 
-code.AF <- c("I48", "I48.0", "I48.1", "I48.2", "I48.3", "I48.4", "I48.9")
+code.AF <- c("I48", "I480", "I481", "I482", "I483", "I484", "I489")
 
+code.delirium <- c("F050","F051","F058","F059","F05")
+
+code.MI <- c("I21", "I22", "I23", "I24")
 
 code.hospitalized <- c("2", "4", "7", "10", "12")
 
@@ -687,6 +711,115 @@ t20_target <- read_fst("data/t20_target(midpoint1).fst", as.data.table = T)
 
 
 
+
+############# Comorbidities ############# 
+
+# Hypertension
+# Atrial fibrilation
+# Diabetes
+# Dyslipidemia
+# kidney disease
+# Stroke
+# Cerebrovascular disease
+
+
+# Hypertension
+
+t20_hypertension_whole <- t20[SICK_SYM1 %like% paste0("^", code.hypertension, collapse = "|") | SICK_SYM2 %like% paste0("^", code.hypertension, collapse = "|")]
+# write_fst(t20_hypertension_whole, "data/t20_hypertension_whole.fst")
+t20_hypertension_whole <- read_fst("data/t20_hypertension_whole.fst", as.data.table = T)
+
+t20_hypertension_whole[, Incident_Date := MDCARE_STRT_DT]
+
+hypertension <- t20_hypertension_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(hypertension = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, hypertension)
+
+
+# Diabetes
+
+t20_diabetes_whole <- t20[SICK_SYM1 %like% paste0("^", code.diabetes, collapse = "|") | SICK_SYM2 %like% paste0("^", code.diabetes, collapse = "|")]
+# write_fst(t20_diabetes_whole, "data/t20_diabetes_whole.fst")
+t20_diabetes_whole <- read_fst("data/t20_diabetes_whole.fst", as.data.table = T)
+
+t20_diabetes_whole[, Incident_Date := MDCARE_STRT_DT]
+
+diabetes <- t20_diabetes_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(diabetes = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, diabetes)
+
+
+# Dyslipidemia
+t20_dyslipidemia_whole <- t20[SICK_SYM1 %like% paste0("^", code.dyslipidemia, collapse = "|") | SICK_SYM2 %like% paste0("^", code.dyslipidemia, collapse = "|")]
+# write_fst(t20_diabetes_whole, "data/t20_dyslipidemia_whole.fst")
+t20_dyslipidemia_whole <- read_fst("data/t20_dyslipidemia_whole.fst", as.data.table = T)
+
+t20_dyslipidemia_whole[, Incident_Date := MDCARE_STRT_DT]
+
+dyslipidemia <- t20_dyslipidemia_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(dyslipidemia = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, dyslipidemia)
+
+
+# Cerebrovascular disease
+t20_cerebrovascular_whole <- t20[SICK_SYM1 %like% paste0("^", code.cerebrovascular, collapse = "|") | SICK_SYM2 %like% paste0("^", code.cerebrovascular, collapse = "|")]
+# write_fst(t20_cerebrovascular_whole, "data/t20_cerebrovascular_whole.fst")
+t20_cerebrovascular_whole <- read_fst("data/t20_cerebrovascular_whole.fst", as.data.table = T)
+
+t20_cerebrovascular_whole[, Incident_Date := MDCARE_STRT_DT]
+
+cerebrovascular <- t20_cerebrovascular_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(cerebrovascular = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, cerebrovascular)
+
+# kidney disease
+code.kidney
+
+t20_kidney_whole <- t20[SICK_SYM1 %like% paste0("^", code.kidney, collapse = "|") | SICK_SYM2 %like% paste0("^", code.kidney, collapse = "|")]
+# write_fst(t20_kidney_whole, "data/t20_kidney_whole.fst")
+t20_kidney_whole <- read_fst("data/t20_kidney_whole.fst", as.data.table = T)
+
+t20_kidney_whole[, Incident_Date := MDCARE_STRT_DT]
+
+kidney <- t20_kidney_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(kidney = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, kidney)
+
+# AF
+
+t20_AF_whole <- t20[SICK_SYM1 %like% paste0("^", code.AF, collapse = "|") | SICK_SYM2 %like% paste0("^", code.AF, collapse = "|")]
+# write_fst(t20_AF_whole, "data/t20_AF_whole.fst")
+t20_AF_whole <- read_fst("data/t20_AF_whole.fst", as.data.table = T)
+
+t20_AF_whole[, Incident_Date := MDCARE_STRT_DT]
+
+AF <- t20_AF_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(AF = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, AF)
+
+
+# Stroke
+
+code.stroke
+
+t20_stroke_whole <- t20[SICK_SYM1 %like% paste0("^", code.stroke, collapse = "|") | SICK_SYM2 %like% paste0("^", code.stroke, collapse = "|")]
+# write_fst(t20_stroke_whole, "data/t20_stroke_whole.fst")
+t20_stroke_whole <- read_fst("data/t20_stroke_whole.fst", as.data.table = T)
+
+t20_stroke_whole[, Incident_Date := MDCARE_STRT_DT]
+
+stroke <- t20_stroke_whole[, .SD[1], keyby=c("INDI_DSCM_NO", "MDCARE_STRT_DT")][t20_target, on=c("INDI_DSCM_NO", "MDCARE_STRT_DT"), roll = Inf] %>%
+  .[, .(stroke = as.integer(!is.na(Incident_Date)))]
+
+t20_target <- cbind(t20_target, stroke)
+
+
 ############# other variables ############# 
 
 # Death
@@ -696,7 +829,7 @@ t20_target <- read_fst("data/t20_target(midpoint1).fst", as.data.table = T)
 # # write_fst(dth, "data/dth.fst")
 dth <- read_fst("data/dth.fst", as.data.table = T)
 
-t20_target <- merge(t20_target, dth[ , .(INDI_DSCM_NO , death_date = DTH_ASSMD_DT)], by="INDI_DSCM_NO", all.x = T)
+t20_target <- merge(t20_target, dth[ , .(INDI_DSCM_NO , death_date = as.Date(as.character(DTH_ASSMD_DT), format="%Y%m%d") )], by="INDI_DSCM_NO", all.x = T)
 t20_target[, Death := fifelse(is.na(death_date),0,1)]
 rm(dth)
 
@@ -751,6 +884,11 @@ t20_target[, Age_old := ifelse(Age<65, "18-64", "65+")]
 # write_fst(t20_target, "data/t20_target(midpoint2).fst")
 t20_target <- read_fst("data/t20_target(midpoint2).fst", as.data.table = T)
 
+
+
+
+
+############# 건강보험 설문 ############# 
 
 # ob_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1e_obj_2002.csv") %>% as.data.table()
 # g1eq_02 <- read.csv("/home/minhyuk.kim/knhis_data/g1eq_2002.csv") %>% as.data.table()
@@ -1188,7 +1326,7 @@ depression.excl <- merge(t20_target, t20_dep, by="INDI_DSCM_NO") %>%
   .[Indexdate > depression_date, .(INDI_DSCM_NO, depression_date)]
 
 
-t20_target <- t20_target[!depression.excl]
+t20_target <- t20_target[!depression.excl , on="INDI_DSCM_NO"]
 
 attr$`Exclusion: Depression before surgery: ` <- nrow(t20_target)
 
@@ -1255,12 +1393,33 @@ cohort.alzh <- merge(t20_target, t20.alzh[, .(INDI_DSCM_NO = as.integer(INDI_DSC
 cohort.alzh <- read_fst("data/cohort_alzh.fst", as.data.table = T)
 
 
-cohort.dementia <- dementia_presc[!cohort.alzh[ ,.(INDI_DSCM_NO)], on= "INDI_DSCM_NO"]
+dementia_presc_without_alzh <- dementia_presc[!cohort.alzh[ ,.(INDI_DSCM_NO)], on= "INDI_DSCM_NO"]
+
+
+dementia.excl <-  merge(t20_target, 
+                  dementia_presc_without_alzh[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_dementia = as.Date(as.character(date_dementia), format="%Y%m%d"))],
+                  by = "INDI_DSCM_NO") %>% 
+              .[Indexdate > date_dementia, .(INDI_DSCM_NO, date_dementia)]  %>% unique 
+
+
+t20_target <- t20_target[!dementia.excl, on="INDI_DSCM_NO"]
+
+
+attr$`Exclusion: dementia disease before surgery` <- nrow(t20_target)
+
+
+cohort.dementia <- merge(t20_target, 
+                         dementia_presc_without_alzh[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_dementia = as.Date(as.character(date_dementia), format="%Y%m%d"))],
+                         by = "INDI_DSCM_NO") %>% 
+                  .[Indexdate <= date_dementia, .(INDI_DSCM_NO, date_dementia)] %>% 
+                  #.[date_dementia - Indexdate >= 365 & date_dementia - Indexdate <= 365.25*5, .(INDI_DSCM_NO, date_dementia) ] %>% 
+                  .[order(INDI_DSCM_NO, date_dementia), .SD[1], by="INDI_DSCM_NO"]
 
 
 t20_target[, dementia := ifelse(INDI_DSCM_NO %in% cohort.dementia$INDI_DSCM_NO, 1, 0)]
-
-t20_target <- merge(t20_target, cohort.dementia[, .(INDI_DSCM_NO = as.integer(INDI_DSCM_NO), date_dementia)], by = "INDI_DSCM_NO", all.x = T)
+t20_target <- merge(t20_target, 
+                    cohort.dementia[, .(INDI_DSCM_NO, date_dementia )], 
+                    by = "INDI_DSCM_NO", all.x = T)
 
 
 
@@ -1278,7 +1437,7 @@ cardiovascular.excl <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)],
   .[Indexdate > date_cardio, .(INDI_DSCM_NO, date_cardio)] %>% 
   unique
 
-t20_target <- t20_target[!cardiovascular.excl,]
+t20_target <- t20_target[!cardiovascular.excl, on="INDI_DSCM_NO"]
 
 
 attr$`Exclusion: Cardiovascular disease before surgery` <- nrow(t20_target)
@@ -1296,21 +1455,19 @@ t20_target <- merge(t20_target, cohort.cardio, by="INDI_DSCM_NO", all.x = T)
 
 
 # New onset Atrial fibrillation
-
-t20_AF <- t20[SICK_SYM1 %like% paste0("^", code.AF, collapse = "|") | SICK_SYM2 %like% paste0("^", code.AF, collapse = "|")]
-# write_fst(t20_AF, "data/t20_AF.fst")
+t20_AF_whole <- read_fst("data/t20_AF_whole.fst", as.data.table = T)
 
 AF.excl <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], 
-                 t20_AF[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_AF = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+                 t20_AF_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_AF = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
            .[Indexdate > date_AF] 
 
-t20_target <- t20_target[!AF.excl]
+t20_target <- t20_target[!AF.excl, on = "INDI_DSCM_NO"]
 
 
 attr$`Exclusion: AF before surgery` <- nrow(t20_target)
 
 
-cohort.AF <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_AF[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_AF = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+cohort.AF <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_AF_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_AF = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
   .[Indexdate <= date_AF] %>% 
   .[date_AF - Indexdate >= 365 & date_AF - Indexdate <= 365.25*5, .(INDI_DSCM_NO, date_AF) ] %>% 
   .[order(INDI_DSCM_NO, date_AF), .SD[1], by="INDI_DSCM_NO"]
@@ -1330,31 +1487,44 @@ t20_readmission_whole <- t20[!SICK_SYM1 %like% paste0("^", c(code.chemotherapy, 
 
 
 
+# write_fst(t20_readmission_whole, "data/t20_readmission_whole.fst")
+t20_readmission_whole <- read_fst("data/t20_readmission_whole.fst", as.data.table = T)
+
 setkey(t20_readmission_whole, INDI_DSCM_NO, date_readmission)
 
 
-# write_fst(t20_readmission_whole, "data/t20_readmission_whole.fst")
-# t20_readmission_whole <- read_fst("data/t20_readmission_whole.fst", as.data.table = T)
-
-aa <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], roll= -30, on=c("INDI_DSCM_NO", "SICK_SYM1", "date_readmission" = "Indexdate")]
-aa[order(INDI_DSCM_NO, date_readmission)]
-aa2 <- aa[, .SD[1], by="INDI_DSCM_NO"]
+# aa <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], roll= -30, on=c("INDI_DSCM_NO", "SICK_SYM1", "date_readmission" = "Indexdate")]
+# aa[order(INDI_DSCM_NO, date_readmission)]
+# aa2 <- aa[, .SD[1], by="INDI_DSCM_NO"]
 
 t20_readmission <- t20_readmission_whole[t20_target[, .(INDI_DSCM_NO, SICK_SYM1, Indexdate)], roll= -30, on=c("INDI_DSCM_NO", "SICK_SYM1", "date_readmission" = "Indexdate")] %>% 
                         .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO" ]
 
 cohort.readmission <- merge(t20_target[, .(INDI_DSCM_NO, CMN_KEY, SICK_SYM1, Indexdate)], t20_readmission, by=c("INDI_DSCM_NO", "SICK_SYM1")) %>% 
                     .[date_readmission - Indexdate <=30 & date_readmission - Indexdate <=365,] %>% 
-                    .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO"]
+                    .[order(INDI_DSCM_NO, date_readmission), .SD[1], by="INDI_DSCM_NO"] %>% 
+                    .[, .(INDI_DSCM_NO, date_readmission)]
+
+
+# write_fst(cohort.readmission, "data/cohort_readmission.fst")
+cohort.readmission <- read_fst("data/cohort_readmission.fst", as.data.table = T)
 
 
 t20_target[, readmission := ifelse(INDI_DSCM_NO %in% cohort.readmission, 1, 0) ]
-
 t20_target <- merge(t20_target, cohort.readmission, by = "INDI_DSCM_NO", all.x = T)
+
+
 
 # Length of stay outcome => VSHSP_DD_CNT
 t20_target[ , length_of_stay := as.numeric(VSHSP_DD_CNT)]
 t20_target[ , VSHSP_DD_CNT := NULL]
+
+
+
+############# midpoint 4 ############# 
+
+# write_fst(t20_target, "data/t20_target(midpoint4).fst") # g1eq 안들어감 
+# t20_target <- read_fst("data/t20_target(midpoint4).fst", as.data.table = T) # 수정이 필요 
 
 
 # opioid consumption 
@@ -1379,6 +1549,7 @@ opiode.whole[, INDI_DSCM_NO := bit64::as.integer64(INDI_DSCM_NO)]
 opiode.whole[, date_opiode := as.Date(as.character(date_opiode), format = "%Y%m%d")]
 # write_fst(opiode.whole, "data/opiode_whole.fst")
 opiode.whole <- read_fst("data/opiode_whole.fst", as.data.table = T)
+
 setkey(opiode.whole, INDI_DSCM_NO,  date_opiode, TOT_PRSC_DD_CNT)
 
 presc_opiode <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], opiode.whole[, .(INDI_DSCM_NO, date_opiode, duration = as.numeric(TOT_PRSC_DD_CNT))], by="INDI_DSCM_NO") %>% 
@@ -1402,13 +1573,159 @@ cohort.opiode <- block.opiode[continuous_days >=28, ]
 
 
 t20_target <- t20_target[, opiode := ifelse(INDI_DSCM_NO %in% cohort.opiode$INDI_DSCM_NO, 1, 0)]
+t20_target <- merge(t20_target, cohort.opiode[, .(INDI_DSCM_NO, date_opiode = start_date)], all.x = T)
+
+
+# Delirium
+
+t20_delirium_whole <- t20[SICK_SYM1 %like% paste0("^", code.delirium, collapse = "|") | SICK_SYM2 %like% paste0("^", code.delirium, collapse = "|")]
+# write_fst(t20_delirium_whole, "data/t20_delirium_whole.fst")
+
+delirium.excl <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], 
+                       t20_delirium_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_delirium = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate > date_delirium, .(INDI_DSCM_NO, date_delirium)] %>% unique
+
+
+t20_target <- t20_target[!delirium.excl, on = "INDI_DSCM_NO"]
+
+attr$`Exclusion: Delirium before surgery` <- nrow(t20_target)
+
+
+cohort.delirium <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_delirium_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_delirium = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate <= date_delirium] %>% 
+  .[date_delirium - Indexdate >= 365 & date_delirium - Indexdate <= 365.25*5, .(INDI_DSCM_NO, date_delirium) ] %>% 
+  .[order(INDI_DSCM_NO, date_delirium), .SD[1], by="INDI_DSCM_NO"]
+
+
+t20_target[, delirium := ifelse(INDI_DSCM_NO %in% cohort.delirium$INDI_DSCM_NO, 1, 0)]
+t20_target <- merge(t20_target, cohort.delirium, by="INDI_DSCM_NO", all.x=T)
+
+
+
+# Acute myocardial infarction
+
+
+t20_MI_whole <- t20[SICK_SYM1 %like% paste0("^", code.MI, collapse = "|") | SICK_SYM2 %like% paste0("^", code.MI, collapse = "|")]
+# write_fst(t20_MI_whole, "data/t20_MI_whole.fst")
+
+MI.excl <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], 
+                       t20_MI_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_MI = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate > date_MI, .(INDI_DSCM_NO, date_MI)] %>% unique
+
+
+t20_target <- t20_target[!MI.excl, on = "INDI_DSCM_NO"]
+
+attr$`Exclusion: acute MI before surgery` <- nrow(t20_target)
+
+
+
+cohort.MI <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_MI_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_MI = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate <= date_MI, .(INDI_DSCM_NO, date_MI) ] %>% 
+  # .[date_MI - Indexdate >= 365 & date_MI - Indexdate <= 365.25*5, .(INDI_DSCM_NO, date_delirium) ] %>% 
+  .[order(INDI_DSCM_NO, date_MI), .SD[1], by="INDI_DSCM_NO"]
+
+
+t20_target[, acute_MI := ifelse(INDI_DSCM_NO %in% cohort.MI$INDI_DSCM_NO, 1, 0)]
+t20_target <- merge(t20_target, cohort.MI, by="INDI_DSCM_NO", all.x=T)
+
+
+# stroke
+
+t20_stroke_whole <- write_fst("data/t20_stroke_whole.fst")
+
+stroke.excl <- merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], 
+                 t20_stroke_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_stroke = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate > date_stroke, .(INDI_DSCM_NO, date_stroke)] %>% unique
+
+
+t20_target <- t20_target[!stroke.excl, on = "INDI_DSCM_NO"]
+
+attr$`Exclusion: stroke before surgery` <- nrow(t20_target)
+
+
+
+cohort.MI <-  merge(t20_target[, .(INDI_DSCM_NO, Indexdate)], t20_MI_whole[, .(INDI_DSCM_NO = bit64::as.integer64(INDI_DSCM_NO), date_MI = as.Date(as.character(MDCARE_STRT_DT), format = "%Y%d%m"))], by = "INDI_DSCM_NO") %>% 
+  .[Indexdate <= date_MI, .(INDI_DSCM_NO, date_MI) ] %>% 
+  # .[date_MI - Indexdate >= 365 & date_MI - Indexdate <= 365.25*5, .(INDI_DSCM_NO, date_delirium) ] %>% 
+  .[order(INDI_DSCM_NO, date_MI), .SD[1], by="INDI_DSCM_NO"]
+
+
+t20_target[, acute_MI := ifelse(INDI_DSCM_NO %in% cohort.MI$INDI_DSCM_NO, 1, 0)]
+t20_target <- merge(t20_target, cohort.MI, by="INDI_DSCM_NO", all.x=T)
+
+
+
+
+
+
+
+## outcome variable with duration
+
+# depression
+
+t20_target[, depression_3months := fifelse(depression_date - Indexdate <= 3*30 , 1 , 0, na = 0)]
+t20_target[, depression_6months := fifelse(depression_date - Indexdate <= 6*30 , 1 , 0, na = 0)]
+t20_target[, depression_1yr := fifelse(depression_date - Indexdate <= 365.25 , 1 , 0, na = 0)]
+t20_target[, depression_5yr := fifelse(depression_date - Indexdate <= 365.25 *5 , 1 , 0, na = 0)]
+
+# Delirium
+
+t20_target[, delirium_3months := fifelse(date_delirium - depression_date <= 3*30 , 1 , 0, na = 0)]
+t20_target[, delirium_6months := fifelse(date_delirium - depression_date <= 6*30 , 1 , 0, na = 0)]
+t20_target[, delirium_1yr := fifelse(date_delirium - depression_date <= 365.25 , 1 , 0, na = 0)]
+t20_target[, delirium_5yr := fifelse(date_delirium - depression_date <= 365.25 *5 , 1 , 0, na = 0)]
+
+
+# Dementia
+
+t20_target[, dementia_3months := fifelse(date_dementia - depression_date <= 3*30 , 1 , 0, na = 0)]
+t20_target[, dementia_6months := fifelse(date_dementia - depression_date <= 6*30 , 1 , 0, na = 0)]
+t20_target[, dementia_1yr := fifelse(date_dementia - depression_date <= 365.25 , 1 , 0, na = 0)]
+t20_target[, dementia_5yr := fifelse(date_dementia - depression_date <= 365.25 * 5 , 1 , 0, na = 0)]
+
+
+# mortality
+t20_target$death_date =  as.Date(as.character(t20_target$death_date), format="%Y%m%d")
+t20_target[, death_3months := fifelse(death_date - depression_date <= 3*30 , 1 , 0, na = 0)]
+t20_target[, death_6months := fifelse(death_date - depression_date <= 6*30 , 1 , 0, na = 0)]
+t20_target[, death_1yr := fifelse(death_date - depression_date <= 365.25 , 1 , 0, na = 0)]
+t20_target[, death_5yr := fifelse(death_date - depression_date <= 365.25 * 5 , 1 , 0, na = 0)]
+
+
+# re-admission
+t20_target[, readmission_3months := fifelse(date_readmission - depression_date <= 3*30 , 1 , 0, na = 0)]
+t20_target[, readmission_6months := fifelse(date_readmission - depression_date <= 6*30 , 1 , 0, na = 0)]
+t20_target[, readmission_1yr := fifelse(date_readmission - depression_date <= 365.25 , 1 , 0, na = 0)]
+t20_target[, readmission_5yr := fifelse(date_readmission - depression_date <= 365.25 * 5 , 1 , 0, na = 0)]
+
+till_now <- copy(t20_target)
+
+write_fst(till_now, "data/till_now.fst")
+
+t20_target <- read_fst("data/till_now.fst")
+
+
+
+
 
 
 
 
 varlist <- list(
-  Base = c("Age", "Age_group", "Sex", "BMI", "smoker", "heavy_drinker", "regular_exercise", "residence", "income_binary", names(code.covariate) ,"CCI_group", "dementia"),
-  Outcome = c("Injury_mechanism", "Injury_location", "new_onset_AF", "Injury_type_simple", "Death", "Hosp_or_Death", "EM_Result_cat")
+  Base = c("Age", "Age_group", "Sex", "BMI", "smoker", "heavy_drinker", "regular_exercise", "residence", "income_binary", names(code.covariate) ,"CCI_group",
+           
+           ),
+  Outcome = c(
+              "depression", "depression_3months", "depression_6months", "depression_1yr", "depression_5yr",
+              "delirium", "delirium_3months", "delirium_6months", "delirium_1yr", "delirium_5yr",
+              "dementia", "dementia_3months", "dementia_6months", "dementia_1yr", "dementia_5yr",
+              "Death", "death_3months", "death_6months", "death_1yr", "death_5yr",
+              "readmission", "readmission_3months", "readmission_6months", "readmission_1yr", "readmission_5yr",
+              "acute_MI", 
+              "stroke", 
+              "cardiovascular", "new_onset_AF",  "opiode", "length_of_stay", 
+              "Depression", 
+             )
 )
 
   
